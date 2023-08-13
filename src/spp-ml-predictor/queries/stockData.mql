@@ -1,0 +1,87 @@
+<loadSecurityExchangeCodesCollectionName>
+organizations
+
+<loadSecurityExchangeCodesMql>
+[
+  {{
+    $match:
+      {{
+        exchange:"{}",
+        status:"Active"
+        {}
+      }}
+  }}
+]
+
+<loadSecurityReturnsCollectionName>
+securityReturns
+
+<loadSecurityReturnsMql>
+[
+  {
+    $match:
+      {
+        exchange: "%s",
+        date: {
+          $gte: "%s",
+          $lte: "%s"
+        },
+        exchangeCode: {$in:[%s]}
+      }
+  }
+]
+
+<loadIndexReturnsCollectionName>
+indexReturns
+
+<loadIndexReturnsMql>
+[
+  {
+    $match:
+      {
+        exchange: "%s",
+        index: "%s",
+        date: {
+          $gte: "%s",
+          $lte: "%s"
+        }
+      }
+  }
+]
+
+<loadSecurityAnalyticsCollectionName>
+securityAnalytics
+
+<loadSecurityAnalyticsMql>
+[
+  {
+    $match:
+      {
+        exchange: "%s",
+        date: {
+          $gte: "%s",
+          $lte: "%s"
+        },
+        exchangeCode: {$in:[%s]}
+      }
+  }
+]
+
+<loadSecurityTrainingPScoreCollectionName>
+trainingPScore
+
+<loadSecurityTrainingPScoreMql>
+[
+  {{
+    $match:
+      {{
+        exchange: "{}",
+        index: "{}",
+        date: {{
+          $gte: "{}",
+          $lte: "{}"
+        }},
+        exchangeCode: {{$in:[{}]}}
+      }}
+  }}
+]
