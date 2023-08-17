@@ -40,3 +40,37 @@ class SppMLTrainingDao:
                 .option("spark.mongodb.read.collection", securityTrainingPScoreCollection)
                 .option("spark.mongodb.read.aggregation.pipeline", securityTrainingPScoreMql)
                 .load())
+
+    def loadSecurityReturns(self, exchangeCodesList, ctx) -> DataFrame:
+
+        exchange = ctx['exchange']
+        trainingStartDate = ctx['trainingStartDate']
+        trainingEndDate = ctx['trainingEndDate']
+        exchangeCodesInStr = ""
+        for ec in exchangeCodesList:
+            exchangeCodesInStr = exchangeCodesInStr+'"'+ec['exchangeCode']+'",'
+
+        exchangeCodesInStr = exchangeCodesInStr.removesuffix(',')
+
+        securityReturnsCollection = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL,"loadSecurityReturnsCollectionName");
+        securityReturnsMql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL,"loadSecurityReturnsMql");
+        securityReturnsMql = securityReturnsMql.format(exchange, trainingStartDate, trainingEndDate, exchangeCodesInStr);
+        return (self.spark.read.format("mongodb")
+                .option("spark.mongodb.read.collection", securityReturnsCollection)
+                .option("spark.mongodb.read.aggregation.pipeline", securityReturnsMql)
+                .load())
+
+    def loadIndexReturns(self, exchangeCodesList, ctx) -> DataFrame:
+
+        exchange = ctx['exchange']
+        index = ctx['index']
+        trainingStartDate = ctx['trainingStartDate']
+        trainingEndDate = ctx['trainingEndDate']
+
+        indexReturnsCollection = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL,"loadIndexReturnsCollectionName");
+        indexReturnsMql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL,"loadIndexReturnsMql");
+        indexReturnsMql = indexReturnsMql.format(exchange, index, trainingStartDate, trainingEndDate);
+        return (self.spark.read.format("mongodb")
+                .option("spark.mongodb.read.collection", indexReturnsCollection)
+                .option("spark.mongodb.read.aggregation.pipeline", indexReturnsMql)
+                .load())

@@ -18,17 +18,17 @@ securityReturns
 
 <loadSecurityReturnsMql>
 [
-  {
+  {{
     $match:
-      {
-        exchange: "%s",
-        date: {
-          $gte: "%s",
-          $lte: "%s"
-        },
-        exchangeCode: {$in:[%s]}
-      }
-  }
+      {{
+        exchange: "{}",
+        date: {{
+          $gte: "{}",
+          $lte: "{}"
+        }},
+        exchangeCode: {{$in:[{}]}}
+      }}
+  }}
 ]
 
 <loadIndexReturnsCollectionName>
@@ -36,17 +36,17 @@ indexReturns
 
 <loadIndexReturnsMql>
 [
-  {
+  {{
     $match:
-      {
-        exchange: "%s",
-        index: "%s",
-        date: {
-          $gte: "%s",
-          $lte: "%s"
-        }
-      }
-  }
+      {{
+        exchange: "{}",
+        index: "{}",
+        date: {{
+          $gte: "{}",
+          $lte: "{}"
+        }}
+      }}
+  }}
 ]
 
 <loadSecurityAnalyticsCollectionName>

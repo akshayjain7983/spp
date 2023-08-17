@@ -1,17 +1,21 @@
 from pyspark.sql import SparkSession
 from ..dao import SppMLTrainingDao
+from ..dao import SppMLTrainingDao
 from ..dao import QueryFiles
 from ..trainer import SppTrainer
 import sys
+
+print(sys.path)
 
 def runSpp(ctx:dict):
     spark = (SparkSession
              .builder
              .remote("sc://localhost:15002")
-             # .config("spark.mongodb.write.connection.uri", "mongodb://localhost:27017")
-             # .config("spark.mongodb.read.connection.uri", "mongodb://localhost:27017")
-             # .config("spark.mongodb.read.database", "spp")
-             # .config("spark.mongodb.write.database", "spp")
+            .appName("Spp")
+            # .config("spark.mongodb.write.connection.uri", "mongodb://localhost:27017")
+            # .config("spark.mongodb.read.connection.uri", "mongodb://localhost:27017")
+            # .config("spark.mongodb.read.database", "spp")
+            # .config("spark.mongodb.write.database", "spp")
              .getOrCreate())
 
     sppMLTrainingDao:SppMLTrainingDao = SppMLTrainingDao.SppMLTrainingDao(spark)
