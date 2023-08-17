@@ -4,6 +4,8 @@ from ..dao import SppMLTrainingDao
 from ..dao import QueryFiles
 from ..trainer import SppTrainer
 import sys
+import os
+
 
 print(sys.path)
 
