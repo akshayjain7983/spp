@@ -16,5 +16,4 @@ class SppTrainingTask:
         forecast = SppArima.buildModel(self.securityDataForExchangeCode)
         endT = time.time()
         print("Time taken:"+str(endT-startT)+" secs")
-        print(forecast)
         return forecast

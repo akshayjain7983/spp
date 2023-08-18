@@ -83,5 +83,12 @@ trainingPScore
         }},
         exchangeCode: {{$in:[{}]}}
       }}
+  }},
+  {{
+    $group:
+      {{
+        _id:"$exchangeCode",
+        doc:{{$addToSet:"$$ROOT"}}
+      }}
   }}
 ]
