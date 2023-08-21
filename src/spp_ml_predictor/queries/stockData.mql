@@ -2,16 +2,7 @@
 organizations
 
 <loadSecurityExchangeCodesMql>
-[
-  {{
-    $match:
-      {{
-        exchange:"{}",
-        status:"Active"
-        {}
-      }}
-  }}
-]
+{{"exchange":"{}", "status":"Active" {} }}
 
 <loadSecurityReturnsCollectionName>
 securityReturns
@@ -73,22 +64,25 @@ trainingPScore
 <loadSecurityTrainingPScoreMql>
 [
   {{
-    $match:
+    "$match":
       {{
-        exchange: "{}",
-        index: "{}",
-        date: {{
-          $gte: "{}",
-          $lte: "{}"
+        "exchange": "{}",
+        "index": "{}",
+        "date": {{
+          "$gte": "{}",
+          "$lte": "{}"
         }},
-        exchangeCode: {{$in:[{}]}}
+        "exchangeCode": {{"$in":[{}]}}
       }}
   }},
   {{
-    $group:
+    "$group":
       {{
-        _id:"$exchangeCode",
-        doc:{{$addToSet:"$$ROOT"}}
+        "_id":"$exchangeCode",
+        "doc":{{"$addToSet":"$$ROOT"}}
       }}
   }}
 ]
+
+<saveForecastPScoreCollectionName>
+forecastPScore

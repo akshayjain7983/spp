@@ -6,26 +6,26 @@ import sys
 
 def runSpp(ctx:dict):
 
-    spark = None
-    sparkMode = ctx['sparkMode']
+    # spark = None
+    # sparkMode = ctx['sparkMode']
+    #
+    # if(sparkMode == 'submit'):
+    #     spark = (SparkSession
+    #              .builder
+    #              .appName("Spp")
+    #              .config("spark.mongodb.write.connection.uri", "mongodb://localhost:27017")
+    #              .config("spark.mongodb.read.connection.uri", "mongodb://localhost:27017")
+    #              .config("spark.mongodb.read.database", "spp")
+    #              .config("spark.mongodb.write.database", "spp")
+    #              .getOrCreate())
+    # else:
+    #     spark = (SparkSession
+    #              .builder
+    #              .appName("Spp")
+    #              .remote("sc://localhost:15002")
+    #              .getOrCreate())
 
-    if(sparkMode == 'submit'):
-        spark = (SparkSession
-                 .builder
-                 .appName("Spp")
-                 .config("spark.mongodb.write.connection.uri", "mongodb://localhost:27017")
-                 .config("spark.mongodb.read.connection.uri", "mongodb://localhost:27017")
-                 .config("spark.mongodb.read.database", "spp")
-                 .config("spark.mongodb.write.database", "spp")
-                 .getOrCreate())
-    else:
-        spark = (SparkSession
-                 .builder
-                 .appName("Spp")
-                 .remote("sc://localhost:15002")
-                 .getOrCreate())
-
-    sppMLTrainingDao:SppMLTrainingDao = SppMLTrainingDao.SppMLTrainingDao(spark)
+    sppMLTrainingDao:SppMLTrainingDao = SppMLTrainingDao.SppMLTrainingDao()
     sppTrainer:SppTrainer = SppTrainer.SppTrainer(sppMLTrainingDao, ctx)
     sppTrainer.train()
 
