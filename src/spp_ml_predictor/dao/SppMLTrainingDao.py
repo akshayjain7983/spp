@@ -21,6 +21,34 @@ class SppMLTrainingDao:
         results = self.mongoClient['spp'][security_codes_collection].find(security_codes_mql_dict)
         return pd.DataFrame(list(results))
 
+    def loadSecurityReturns(self, exchangeCodesList, ctx) -> pd.DataFrame:
+        exchange = ctx['exchange']
+        trainingStartDate = ctx['trainingStartDate']
+        trainingEndDate = ctx['trainingEndDate']
+        exchangeCodesInStr = ""
+        for ec in exchangeCodesList:
+            exchangeCodesInStr = exchangeCodesInStr + '"' + ec + '",'
+
+        exchangeCodesInStr = exchangeCodesInStr.removesuffix(',')
+        securityReturnsCollection = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL,"loadSecurityReturnsCollectionName");
+        securityReturnsMql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL, "loadSecurityReturnsMql");
+        securityReturnsMql = securityReturnsMql.format(exchange, trainingStartDate, trainingEndDate, exchangeCodesInStr);
+        securityReturnsMql_dict = json.loads(securityReturnsMql)
+        results = self.mongoClient['spp'][securityReturnsCollection].find(securityReturnsMql_dict)
+        return pd.DataFrame(list(results))
+
+    def loadIndexReturns(self, ctx) -> pd.DataFrame:
+        exchange = ctx['exchange']
+        trainingStartDate = ctx['trainingStartDate']
+        trainingEndDate = ctx['trainingEndDate']
+        index = ctx['index']
+
+        indexReturnsCollection = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL,"loadIndexReturnsCollectionName");
+        indexReturnsMql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL, "loadIndexReturnsMql");
+        indexReturnsMql = indexReturnsMql.format(exchange, index, trainingStartDate, trainingEndDate);
+        indexReturnsMql_dict = json.loads(indexReturnsMql)
+        results = self.mongoClient['spp'][indexReturnsCollection].find(indexReturnsMql_dict)
+        return pd.DataFrame(list(results))
 
     def loadSecurityTrainingPScore(self, exchangeCodesList, ctx) -> pd.DataFrame:
 
@@ -41,6 +69,6 @@ class SppMLTrainingDao:
         results = self.mongoClient['spp'][securityTrainingPScoreCollection].aggregate(securityTrainingPScoreMql_dict)
         return pd.DataFrame(list(results))
 
-    def saveForecastPScore(self, forecastPScore):
+    def saveForecastPScore(self, forecastPScore:pd.DataFrame):
         forecastPScoreCollection = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL, "saveForecastPScoreCollectionName");
-        forecastPScore.write.format("mongodb").mode("append").option("collection", forecastPScoreCollection).save()
+        self.mongoClient['spp'][forecastPScoreCollection].insert_many(forecastPScore.to_dict(orient="records"))

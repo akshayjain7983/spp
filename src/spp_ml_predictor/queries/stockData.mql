@@ -2,43 +2,36 @@
 organizations
 
 <loadSecurityExchangeCodesMql>
-{{"exchange":"{}", "status":"Active" {} }}
+{{
+    "exchange":"{}",
+    "status":"Active" {}
+}}
 
 <loadSecurityReturnsCollectionName>
 securityReturns
 
 <loadSecurityReturnsMql>
-[
-  {{
-    $match:
-      {{
-        exchange: "{}",
-        date: {{
-          $gte: "{}",
-          $lte: "{}"
-        }},
-        exchangeCode: {{$in:[{}]}}
-      }}
-  }}
-]
+{{
+    "exchange": "{}",
+    "date": {{
+      "$gte": "{}",
+      "$lte": "{}"
+    }},
+    "exchangeCode": {{"$in":[{}]}}
+}}
 
 <loadIndexReturnsCollectionName>
 indexReturns
 
 <loadIndexReturnsMql>
-[
-  {{
-    $match:
-      {{
-        exchange: "{}",
-        index: "{}",
-        date: {{
-          $gte: "{}",
-          $lte: "{}"
-        }}
-      }}
-  }}
-]
+{{
+    "exchange": "{}",
+    "index": "{}",
+    "date": {{
+      "$gte": "{}",
+      "$lte": "{}"
+    }}
+}}
 
 <loadSecurityAnalyticsCollectionName>
 securityAnalytics

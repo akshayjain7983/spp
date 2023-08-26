@@ -3,27 +3,9 @@ from .dao import SppMLTrainingDao
 from .dao import QueryFiles
 from .trainer import SppTrainer
 import sys
+from datetime import datetime, timezone, timedelta
 
 def runSpp(ctx:dict):
-
-    # spark = None
-    # sparkMode = ctx['sparkMode']
-    #
-    # if(sparkMode == 'submit'):
-    #     spark = (SparkSession
-    #              .builder
-    #              .appName("Spp")
-    #              .config("spark.mongodb.write.connection.uri", "mongodb://localhost:27017")
-    #              .config("spark.mongodb.read.connection.uri", "mongodb://localhost:27017")
-    #              .config("spark.mongodb.read.database", "spp")
-    #              .config("spark.mongodb.write.database", "spp")
-    #              .getOrCreate())
-    # else:
-    #     spark = (SparkSession
-    #              .builder
-    #              .appName("Spp")
-    #              .remote("sc://localhost:15002")
-    #              .getOrCreate())
 
     sppMLTrainingDao:SppMLTrainingDao = SppMLTrainingDao.SppMLTrainingDao()
     sppTrainer:SppTrainer = SppTrainer.SppTrainer(sppMLTrainingDao, ctx)
@@ -32,21 +14,31 @@ def runSpp(ctx:dict):
 def main(args):
     QueryFiles.load()
 
-    trainingStartDate = args[0]
-    trainingEndDate = args[1]
+    pScoreDate = args[0]
+    forecastDays = args[1]
     exchange = args[2]
     index = args[3]
-    exchangeCode = args[4] if len(args) >= 5 else None
-    sparkMode = args[5] if len(args) >= 6 else 'connect'
+    dataHistoryYears = args[4]
+    exchangeCode = args[5] if len(args) >= 6 else None
 
-    ctx = {'exchange': exchange
-        , 'trainingStartDate': trainingStartDate
-        , 'trainingEndDate': trainingEndDate
-        , 'index': index
-        , 'exchangeCode': exchangeCode
-        , 'sparkMode': sparkMode}
+    trainingDataDays = 365*int(dataHistoryYears)
+    trainingEndDate = pScoreDate
+    trainingStartDate = datetime.strftime(datetime.strptime(trainingEndDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
 
-    runSpp(ctx)
+    for i in range(365):
+        ctx = {'exchange': exchange
+               , 'pScoreDate':pScoreDate
+               , 'trainingStartDate': trainingStartDate
+               , 'trainingEndDate': trainingEndDate
+               , 'index': index
+               , 'exchangeCode': exchangeCode
+               , 'forecastDays': int(forecastDays)}
+
+        runSpp(ctx)
+        pScoreDate = datetime.strftime(datetime.strptime(pScoreDate, '%Y-%m-%d') + timedelta(days=1), '%Y-%m-%d')
+        trainingEndDate = pScoreDate
+        trainingStartDate = datetime.strftime(datetime.strptime(trainingEndDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
+
 
 
 if __name__ == '__main__':

@@ -1,80 +1,73 @@
-from typing import Iterator
-
 from ..dao import SppMLTrainingDao
-# import pyspark.sql as ps
-# import pyspark.sql.functions as psf
-from pylab import rcParams
 import pandas as pd
-import matplotlib.pyplot as plt
-import concurrent.futures
-from ..trainer import SppTrainingTask
-from pyspark.sql.functions import pandas_udf, PandasUDFType
-from pyspark.sql.streaming.state import GroupState
-from pyspark.sql.streaming.state import Tuple
-from datetime import datetime,timezone
+from ..trainer import SppSecurityForecastTask
+from ..trainer import SppIndexForecastTask
 from concurrent.futures import *
+from datetime import datetime
+import time
 
 class SppTrainer:
     def __init__(self, sppMLTrainingDao:SppMLTrainingDao, ctx:dict):
         self.sppMLTrainingDao = sppMLTrainingDao
         self.ctx = ctx
 
-    def __submitForTrainingTask__(self, psdf: pd.DataFrame) -> pd.DataFrame:
-        print("====================starting submitForTrainingTask==========")
-        print(psdf)
-        psdfForTraining = pd.json_normalize(psdf['doc'][0])
-        psdfForTraining = psdfForTraining[
-            ["exchange", "index", "exchangeCode", "isin", "date", "trainingPScore.90D.pScore"]]
-        psdfForTraining.rename(columns={"trainingPScore.90D.pScore": "pScore"}, inplace=True)
-        psdfForTraining.set_index("date", inplace=True)
-        psdfForTraining.sort_index(inplace=True)
-        sppTrainingTask = SppTrainingTask.SppTrainingTask(psdfForTraining)
+    def __submitForSppSecurityForecastTask__(self, forecastIndexReturns:pd.DataFrame, securityReturnsPdf:pd.DataFrame) -> pd.DataFrame:
+
+        securityReturnsPdfLocal = securityReturnsPdf.copy()
+        securityReturnsPdfLocal['datetime'] = pd.to_datetime(securityReturnsPdfLocal['date'])
+        securityReturnsPdfLocal.set_index("datetime", inplace=True, drop=True)
+        securityReturnsPdfLocal.sort_index(inplace=True)
+        securityReturnsReindexPdf = pd.date_range(start=datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d'),
+                                                  end=datetime.strptime(self.ctx['pScoreDate'], '%Y-%m-%d'),
+                                                  inclusive="both")
+        securityReturnsPdfLocal = securityReturnsPdfLocal.reindex(securityReturnsReindexPdf, method='ffill')
+        securityReturnsPdfLocal.dropna(inplace=True) #sometimes ffill with reindex may result in nan at begining so drop those
+        securityReturns90DSeries = [d.get('90D').get('return') for d in securityReturnsPdfLocal["returns"]]
+        securityReturnsPdfLocal.drop("returns", axis=1, inplace=True)
+        securityReturnsPdfLocal["securityReturns90D"] = securityReturns90DSeries
+        sppTrainingTask = SppSecurityForecastTask.SppSecurityForecastTask(forecastIndexReturns, securityReturnsPdfLocal, self.ctx)
         forecast = sppTrainingTask.buildModel()
-        forecast.insert(0, "exchange", psdfForTraining['exchange'][0])
-        forecast.insert(1, "index", psdfForTraining['index'][0])
-        forecast.insert(2, "exchangeCode", psdfForTraining['exchangeCode'][0])
-        forecast.insert(3, "isin", psdfForTraining['isin'][0])
-        print("====================finishing submitForTrainingTask==========")
+        self.sppMLTrainingDao.saveForecastPScore(forecast)
+        return forecast;
+
+    def __submitForSppIndexForecastTask__(self, indexReturnsPdf:pd.DataFrame) -> pd.DataFrame:
+
+        indexReturnsPdfLocal = indexReturnsPdf.copy()
+        indexReturnsPdfLocal['datetime'] = pd.to_datetime(indexReturnsPdfLocal['date'])
+        indexReturnsPdfLocal.set_index("datetime", inplace=True, drop=True)
+        indexReturnsPdfLocal.sort_index(inplace=True)
+        indexReturnsReindexPdf = pd.date_range(start=datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d'),
+                                               end=datetime.strptime(self.ctx['pScoreDate'], '%Y-%m-%d'),
+                                               inclusive="both")
+        indexReturnsPdfLocal = indexReturnsPdfLocal.reindex(indexReturnsReindexPdf, method='ffill')
+        indexReturnsPdfLocal.dropna(inplace=True) #sometimes ffill with reindex may result in nan at begining so drop those
+        indexReturns90DSeries = [d.get('90D').get('return') for d in indexReturnsPdfLocal["returns"]]
+        indexReturnsPdfLocal.drop("returns", axis=1, inplace=True)
+        indexReturnsPdfLocal["indexReturns90D"] = indexReturns90DSeries
+        sppTrainingTask = SppIndexForecastTask.SppIndexForecastTask(indexReturnsPdfLocal, self.ctx)
+        forecast = sppTrainingTask.buildModel()
         return forecast;
 
     def train(self):
-        print(self.ctx)
+
+        startT = time.time()
         exchangeCodeDf:pd.DataFrame = self.sppMLTrainingDao.loadSecurityExchangeCodes(self.ctx)
         exchangeCodeDf = exchangeCodeDf[["exchangeCode"]].copy()
-        # exchangeCodeDf = exchangeCodeDf.select("exchangeCode").cache()
-        # exchangeCodeList = exchangeCodeDf.collect()
-        print(exchangeCodeDf)
-        trainingPscoreDf:pd.DataFrame = self.sppMLTrainingDao.loadSecurityTrainingPScore(exchangeCodeDf['exchangeCode'], self.ctx)
-        print(trainingPscoreDf)
+        securityReturnsPdf:pd.DataFrame = self.sppMLTrainingDao.loadSecurityReturns(exchangeCodeDf['exchangeCode'], self.ctx)
+        indexReturnsPdf:pd.DataFrame = self.sppMLTrainingDao.loadIndexReturns(self.ctx)
+
+        forecastIndexReturns = self.__submitForSppIndexForecastTask__(indexReturnsPdf)
+
 
         futures = []
-
-        with ThreadPoolExecutor(max_workers=1) as executor:
-
-            for ec in trainingPscoreDf['_id']:
-                future = executor.submit(self.__submitForTrainingTask__, trainingPscoreDf[trainingPscoreDf['_id'] == ec])
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            for ec in exchangeCodeDf['exchangeCode']:
+                future = executor.submit(self.__submitForSppSecurityForecastTask__, forecastIndexReturns, securityReturnsPdf[securityReturnsPdf['exchangeCode'] == ec])
                 futures.append(future)
 
 
         for f in futures:
             print(f.result())
 
-
-
-        # sparkMode = self.ctx['sparkMode']
-
-        # if(sparkMode == 'submit'):
-        #     forecast = trainingPscoreDf.repartitionByRange(1, "_id").groupBy('_id').applyInPandas(submitForTrainingTask, 'exchange string, index string, exchangeCode string, isin string, date string'
-        #                                                                                     ', forecastPScore double, forecastPScoreModel string')
-        #
-        #     forecast = (forecast
-        #                 .withColumnRenamed("forecastPScore", "forecastPScore.90D.pScore")
-        #                 .withColumnRenamed("forecastPScoreModel", "forecastPScore.90D.model")
-        #                 .withColumn("lastUpdatedTimestamp", psf.lit(datetime.strftime(datetime.now(timezone.utc), '%Y-%m-%dT%H:%M:%S%z'))))
-        #     forecast.show()
-        #     self.sppMLTrainingDao.saveForecastPScore(forecast)
-        #
-        # else:
-        #     forecast = submitForTrainingTask(trainingPscoreDf.toPandas())
-        #     print(forecast)
-
+        endT = time.time()
+        print("SppTrainer - "+self.ctx['pScoreDate']+" - Time taken:" + str(endT - startT) + " secs")
