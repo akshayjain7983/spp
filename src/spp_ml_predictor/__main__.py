@@ -18,10 +18,11 @@ def main(args):
     forecastDays = args[1]
     exchange = args[2]
     index = args[3]
-    dataHistoryYears = args[4]
-    exchangeCode = args[5] if len(args) >= 6 else None
+    dataHistoryMonths = args[4]
+    regressor = args[5]
+    exchangeCode = args[6] if len(args) >= 7 else None
 
-    trainingDataDays = 365*int(dataHistoryYears)
+    trainingDataDays = 30*int(dataHistoryMonths)
     trainingEndDate = pScoreDate
     trainingStartDate = datetime.strftime(datetime.strptime(trainingEndDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
 
@@ -32,7 +33,8 @@ def main(args):
                , 'trainingEndDate': trainingEndDate
                , 'index': index
                , 'exchangeCode': exchangeCode
-               , 'forecastDays': int(forecastDays)}
+               , 'forecastDays': int(forecastDays)
+               , 'regressor': regressor}
 
         runSpp(ctx)
         pScoreDate = datetime.strftime(datetime.strptime(pScoreDate, '%Y-%m-%d') + timedelta(days=1), '%Y-%m-%d')

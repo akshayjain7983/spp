@@ -5,6 +5,7 @@ from ..dao import QueryFiles
 from ..dao import QueryHolder
 from pymongo import MongoClient
 import json
+from datetime import datetime
 
 class SppMLTrainingDao:
 
@@ -35,6 +36,22 @@ class SppMLTrainingDao:
         securityReturnsMql = securityReturnsMql.format(exchange, trainingStartDate, trainingEndDate, exchangeCodesInStr);
         securityReturnsMql_dict = json.loads(securityReturnsMql)
         results = self.mongoClient['spp'][securityReturnsCollection].find(securityReturnsMql_dict)
+        return pd.DataFrame(list(results))
+
+    def loadSecurityPrices(self, exchangeCodesList, ctx) -> pd.DataFrame:
+        exchange = ctx['exchange']
+        trainingStartDate = ctx['trainingStartDate']
+        trainingEndDate = ctx['trainingEndDate']
+        exchangeCodesInStr = ""
+        for ec in exchangeCodesList:
+            exchangeCodesInStr = exchangeCodesInStr + '"' + ec + '",'
+
+        exchangeCodesInStr = exchangeCodesInStr.removesuffix(',')
+        securityPricesCollection = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL,"loadSecurityPricesCollectionName");
+        securityPricesMql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL, "loadSecurityPricesMql");
+        securityPricesMql = securityPricesMql.format(exchange, trainingStartDate, trainingEndDate, exchangeCodesInStr);
+        securityPricesMql_dict = json.loads(securityPricesMql)
+        results = self.mongoClient['spp'][securityPricesCollection].find(securityPricesMql_dict)
         return pd.DataFrame(list(results))
 
     def loadIndexReturns(self, ctx) -> pd.DataFrame:
@@ -68,6 +85,39 @@ class SppMLTrainingDao:
         securityTrainingPScoreMql_dict = json.loads(securityTrainingPScoreMql)
         results = self.mongoClient['spp'][securityTrainingPScoreCollection].aggregate(securityTrainingPScoreMql_dict)
         return pd.DataFrame(list(results))
+
+    def loadInterestRates(self, institution, rateType):
+
+        interestRatesCollectionName = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL, "loadInterestRatesCollectionName");
+        interestRatesMql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL, "loadInterestRatesMql")
+        interestRatesMql = interestRatesMql.format(institution, rateType)
+        interestRatesMql_dict = json.loads(interestRatesMql)
+        results = self.mongoClient['spp'][interestRatesCollectionName].find(interestRatesMql_dict)
+        interestRates = pd.DataFrame(list(results))
+        interestRates['datetime'] = pd.to_datetime(interestRates['date'], format="%d-%m-%Y")
+        interestRates.set_index('datetime', inplace=True, drop=True)
+        interestRates.sort_index(inplace=True)
+        interestRates.drop_duplicates(subset=['date'], inplace=True)
+        interestRatesReindexPdf = pd.date_range(start=interestRates.index.min(),end=interestRates.index.max(), inclusive="both")
+        interestRates = interestRates.reindex(interestRatesReindexPdf, method='ffill')
+        return interestRates
+
+    def loadInflationRates(self, institution, rateType):
+
+        inflationRatesCollectionName = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL, "loadInflationRatesCollectionName");
+        inflationRatesMql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL, "loadInflationtRatesMql")
+        inflationRatesMql = inflationRatesMql.format(institution, rateType)
+        inflationRatesMql_dict = json.loads(inflationRatesMql)
+        results = self.mongoClient['spp'][inflationRatesCollectionName].find(inflationRatesMql_dict)
+        inflationRates = pd.DataFrame(list(results))
+        inflationRates['datetime'] = pd.to_datetime(inflationRates['date'], format="%Y-%m-%d")
+        inflationRates.set_index('datetime', inplace=True, drop=True)
+        inflationRates.sort_index(inplace=True)
+        inflationRates.drop_duplicates(subset=['date'], inplace=True)
+        inflationRatesReindexPdf = pd.date_range(start=inflationRates.index.min(),end=inflationRates.index.max(), inclusive="both")
+        inflationRates = inflationRates.reindex(inflationRatesReindexPdf, method='bfill')
+        return inflationRates
+
 
     def saveForecastPScore(self, forecastPScore:pd.DataFrame):
         forecastPScoreCollection = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL, "saveForecastPScoreCollectionName");

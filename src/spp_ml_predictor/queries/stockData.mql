@@ -51,6 +51,24 @@ securityAnalytics
   }
 ]
 
+<loadSecurityPricesCollectionName>
+securityPrices
+
+<loadSecurityPricesMql>
+[
+  {{
+    $match:
+      {{
+        exchange: "{}",
+        date: {{
+          $gte: "{}",
+          $lte: "{}"
+        }},
+        exchangeCode: {{$in:[{}]}}
+      }}
+  }}
+]
+
 <loadSecurityTrainingPScoreCollectionName>
 trainingPScore
 
@@ -79,3 +97,21 @@ trainingPScore
 
 <saveForecastPScoreCollectionName>
 forecastPScore
+
+<loadInterestRatesCollectionName>
+interestRates
+
+<loadInterestRatesMql>
+{{
+    "institution":"{}",
+    "rateType":"{}"
+}}
+
+<loadInflationRatesCollectionName>
+inflationRates
+
+<loadInflationtRatesMql>
+{{
+    "institution":"{}",
+    "rateType":"{}"
+}}
