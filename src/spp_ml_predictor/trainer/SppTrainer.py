@@ -36,7 +36,7 @@ class SppTrainer:
 
         sppTrainingTask = SppSecurityForecastTask(forecastIndexReturns, securityReturnsPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
-        # self.sppMLTrainingDao.saveForecastPScore(forecast)
+        self.sppMLTrainingDao.saveForecastPScore(forecast)
         return forecast;
 
     def __submitForSppIndexForecastTask__(self

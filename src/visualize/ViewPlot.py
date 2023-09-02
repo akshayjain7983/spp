@@ -6,8 +6,9 @@ from sklearn.metrics import mean_squared_error
 from math import sqrt
 
 if __name__ == '__main__':
+    forecastPeriod = "30D"
     mongoClient = MongoClient("mongodb://localhost:27017")
-    forecastPScoreMql = {"exchangeCode":"500086", "date":{"$gte":"2018-09-01", "$lte":"2019-08-31"}, "forecastPeriod":"30D", "lastUpdatedTimestamp":{"$gte":"2023-09-01"}, "forecastModel":"SppDecisionTree"}
+    forecastPScoreMql = {"exchangeCode":"500086", "date":{"$gte":"2018-09-01", "$lte":"2019-08-31"}, "forecastPeriod":forecastPeriod, "lastUpdatedTimestamp":{"$gte":"2023-09-01"}, "forecastModel":"SppRidge"}
     forecastPScoreMongoResult = mongoClient['spp']['forecastPScore'].find(forecastPScoreMql)
     forecastPScorePd = pd.DataFrame(list(forecastPScoreMongoResult))
     forecastPScorePd = forecastPScorePd[['date', 'forecastedPScore', 'forecastedIndexReturn', 'forecastedSecurityReturn']]
@@ -23,9 +24,9 @@ if __name__ == '__main__':
     trainingPScoreMongoResult = mongoClient['spp']['trainingPScore'].find(trainingPScoreMql)
     trainingPScorePd = pd.DataFrame(list(trainingPScoreMongoResult))
     trainingPScorePd = trainingPScorePd[['date', 'trainingPScore']]
-    trainingPScorePdSeries = [d.get('30D').get('pScore') for d in trainingPScorePd["trainingPScore"]]
-    trainingIndexReturnsPdSeries = [d.get('30D').get('indexReturns') for d in trainingPScorePd["trainingPScore"]]
-    trainingSecurityReturnsPdSeries = [d.get('30D').get('securityReturns') for d in trainingPScorePd["trainingPScore"]]
+    trainingPScorePdSeries = [d.get(forecastPeriod).get('pScore') for d in trainingPScorePd["trainingPScore"]]
+    trainingIndexReturnsPdSeries = [d.get(forecastPeriod).get('indexReturns') for d in trainingPScorePd["trainingPScore"]]
+    trainingSecurityReturnsPdSeries = [d.get(forecastPeriod).get('securityReturns') for d in trainingPScorePd["trainingPScore"]]
     trainingPScorePd.drop("trainingPScore", axis=1, inplace=True)
     trainingPScorePd["trainingPScore"] = trainingPScorePdSeries
     trainingPScorePd["trainingPScore"] = trainingPScorePd["trainingPScore"]

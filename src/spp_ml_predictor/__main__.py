@@ -26,7 +26,7 @@ def main(args):
     trainingEndDate = pScoreDate
     trainingStartDate = datetime.strftime(datetime.strptime(trainingEndDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
 
-    for i in range(1):
+    for i in range(365):
         ctx = {'exchange': exchange
                , 'pScoreDate':pScoreDate
                , 'trainingStartDate': trainingStartDate

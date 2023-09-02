@@ -48,7 +48,7 @@ class SppMLForecaster(SppForecaster):
         xtraDataPdfTrain = self.xtraDataPdf[self.xtraDataPdf.index.isin(train.index)]
         train_features = train[[f'value_lag_diff_{i+2}' for i in range(self.lags-1)]]
         train_features = pd.concat([train_features, xtraDataPdfTrain], axis=1)
-        train_labels = train[['value_lag_diff_1']]
+        train_labels = train['value_lag_diff_1']
 
         dtr = self.__getRegressor__(train_features, train_labels)
 
@@ -68,7 +68,7 @@ class SppMLForecaster(SppForecaster):
             pred.loc[nextForecastDate] = nextRow
 
 
-        return pd.DataFrame({"forecastDate": thisForecastDate, "value": nextForecastValue, "forecastModel": self.name}, index=[0])
+        return pd.DataFrame({"forecastDate": thisForecastDate, "value": nextForecastValue, "forecastModel": self.__getName__()}, index=[0])
 
     def __getNextRow__(self, pred:pd.DataFrame, nextForecastValue:float, thisForecastDate:datetime):
         row = []

@@ -8,6 +8,8 @@ class SppArima(SppForecaster):
         super().__init__(trainingDataPdf, ctx, xtraDataPdf)
         self.name = "SppArima"
 
+    def __getName__(self):
+        return self.name
     def forecast(self) -> pd.DataFrame:
 
         pScoreDate = self.ctx['pScoreDate']
@@ -30,4 +32,4 @@ class SppArima(SppForecaster):
         forecast = model.predict(n_periods=forecastDays, X=self.xtraDataPdf[-forecastDays:])
         value = forecast[forecast.shape[0]-1]
 
-        return pd.DataFrame({"forecastDate": endDate, "value": value, "forecastModel": self.name}, index=[0])
+        return pd.DataFrame({"forecastDate": endDate, "value": value, "forecastModel": self.__getName__()}, index=[0])
