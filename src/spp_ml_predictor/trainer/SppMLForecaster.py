@@ -37,6 +37,8 @@ class SppMLForecaster(SppForecaster):
     def __getRegressor__(self, train_features:pd.DataFrame, train_labels:pd.DataFrame):
         return None
 
+    def __preparePredFeatures__(self, pred_features:pd.DataFrame):
+        return pred_features
     def __buildAndForecast__(self, trainingData:pd.DataFrame) -> pd.DataFrame:
         startDate = datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d')
         endDate = datetime.strptime(self.ctx['trainingEndDate'], '%Y-%m-%d')
@@ -56,6 +58,7 @@ class SppMLForecaster(SppForecaster):
             pred_features = pred.filter(items=[nextForecastDate], axis=0)[[f'value_lag_diff_{i+2}' for i in range(self.lags-1)]]
             xtraDataPdfPred = self.xtraDataPdf[self.xtraDataPdf.index.isin(pred_features.index)]
             pred_features = pd.concat([pred_features, xtraDataPdfPred], axis=1)
+            pred_features = self.__preparePredFeatures__(pred_features)
             pred_labels = dtr.predict(pred_features)
             nextForecastValueLagDiff1 = pred_labels[0]
             nextForecastValueLag1 = pred['value_lag_1'][nextForecastDate]

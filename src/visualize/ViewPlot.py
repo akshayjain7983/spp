@@ -8,7 +8,7 @@ from math import sqrt
 if __name__ == '__main__':
     forecastPeriod = "30D"
     mongoClient = MongoClient("mongodb://localhost:27017")
-    forecastPScoreMql = {"exchangeCode":"500086", "date":{"$gte":"2018-09-01", "$lte":"2019-08-31"}, "forecastPeriod":forecastPeriod, "lastUpdatedTimestamp":{"$gte":"2023-09-01"}, "forecastModel":"SppRidge"}
+    forecastPScoreMql = {"exchangeCode":"500086", "date":{"$gte":"2018-09-01", "$lte":"2019-08-31"}, "forecastPeriod":forecastPeriod, "forecastModel":"SppArima"}
     forecastPScoreMongoResult = mongoClient['spp']['forecastPScore'].find(forecastPScoreMql)
     forecastPScorePd = pd.DataFrame(list(forecastPScoreMongoResult))
     forecastPScorePd = forecastPScorePd[['date', 'forecastedPScore', 'forecastedIndexReturn', 'forecastedSecurityReturn']]
@@ -16,9 +16,9 @@ if __name__ == '__main__':
     forecastPScorePd['datetime'] = pd.to_datetime(forecastPScorePd['date'])
     forecastPScorePd.set_index('datetime', drop=True, inplace=True)
     forecastPScorePd.sort_index(inplace=True)
-    forecastPScorePdReindex = pd.date_range(start=datetime.strptime("2018-09-01", "%Y-%m-%d"), end=datetime.strptime("2019-08-31", "%Y-%m-%d"), inclusive="both")
+    # forecastPScorePdReindex = pd.date_range(start=datetime.strptime("2018-09-01", "%Y-%m-%d"), end=datetime.strptime("2019-08-31", "%Y-%m-%d"), inclusive="both")
     forecastPScorePd.drop_duplicates(subset=['date'], inplace=True)
-    forecastPScorePd = forecastPScorePd.reindex(forecastPScorePdReindex)
+    # forecastPScorePd = forecastPScorePd.reindex(forecastPScorePdReindex)
 
     trainingPScoreMql = {"exchangeCode": "500086", "date":{"$gte":"2018-09-01", "$lte":"2019-08-31"}}
     trainingPScoreMongoResult = mongoClient['spp']['trainingPScore'].find(trainingPScoreMql)

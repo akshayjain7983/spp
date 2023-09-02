@@ -5,6 +5,7 @@ from ..trainer.SppDecisionTree import SppDecisionTree
 from ..trainer.SppForecaster import SppForecaster
 from ..trainer.SppRandomForests import SppRandomForests
 from ..trainer.SppRidge import SppRidge
+from ..trainer.SppPolyRidge import SppPolyRidge
 
 class SppForecastTask:
     def __init__(self, trainingDataForForecasting:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
@@ -24,6 +25,8 @@ class SppForecastTask:
                 sppForecaster = SppRandomForests(trainingData, self.ctx, self.xtraDataPdf)
             case "SppRidge":
                 sppForecaster = SppRidge(trainingData, self.ctx, self.xtraDataPdf)
+            case "SppPolyRidge":
+                sppForecaster = SppPolyRidge(trainingData, self.ctx, self.xtraDataPdf)
 
         return sppForecaster.forecast()
 
