@@ -1,7 +1,7 @@
 from ..dao import SppMLTrainingDao
 import pandas as pd
-from ..trainer import SppSecurityForecastTask
-from ..trainer import SppIndexForecastTask
+from ..trainer.SppSecurityForecastTask import SppSecurityForecastTask
+from ..trainer.SppIndexForecastTask import SppIndexForecastTask
 from concurrent.futures import *
 from datetime import datetime, timedelta
 import time
@@ -34,9 +34,9 @@ class SppTrainer:
         xtraDataPdf.rename(columns={"rate": "repo"}, inplace=True)
         xtraDataPdf['inflation'] = inflationRatesPdf['rate']
 
-        sppTrainingTask = SppSecurityForecastTask.SppSecurityForecastTask(forecastIndexReturns, securityReturnsPdfLocal, self.ctx, xtraDataPdf)
-        forecast = sppTrainingTask.buildModel()
-        self.sppMLTrainingDao.saveForecastPScore(forecast)
+        sppTrainingTask = SppSecurityForecastTask(forecastIndexReturns, securityReturnsPdfLocal, self.ctx, xtraDataPdf)
+        forecast = sppTrainingTask.forecast()
+        # self.sppMLTrainingDao.saveForecastPScore(forecast)
         return forecast;
 
     def __submitForSppIndexForecastTask__(self
@@ -62,8 +62,8 @@ class SppTrainer:
         xtraDataPdf['inflation'] = inflationRatesPdf['rate']
 
 
-        sppTrainingTask = SppIndexForecastTask.SppIndexForecastTask(indexReturnsPdfLocal, self.ctx, xtraDataPdf)
-        forecast = sppTrainingTask.buildModel()
+        sppTrainingTask = SppIndexForecastTask(indexReturnsPdfLocal, self.ctx, xtraDataPdf)
+        forecast = sppTrainingTask.forecast()
         return forecast;
 
     def train(self):

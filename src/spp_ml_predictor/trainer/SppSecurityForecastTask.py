@@ -3,8 +3,9 @@ from datetime import datetime, timezone
 
 import pandas as pd
 import time
-from ..trainer import SppArima
-from ..trainer import SppDecisionTree
+from ..trainer.SppArima import SppArima
+from ..trainer.SppDecisionTree import SppDecisionTree
+from ..trainer.SppForecaster import SppForecaster
 
 class SppSecurityForecastTask:
     def __init__(self, forecastIndexReturns:pd.DataFrame, securityDataForExchangeCode:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
@@ -13,11 +14,11 @@ class SppSecurityForecastTask:
         self.ctx = ctx
         self.xtraDataPdf = xtraDataPdf
 
-    def buildModel(self) -> pd.DataFrame:
+    def forecast(self) -> pd.DataFrame:
 
         startT = time.time();
         securityDataForExchangeCodeForTraining = self.securityDataForExchangeCode.rename(columns={"securityReturns90D": "value"})
-        forecast = self.invokeRegressor(securityDataForExchangeCodeForTraining)
+        forecast = self.invokeForecastor(securityDataForExchangeCodeForTraining)
 
         forecastedSecurityReturn = forecast['value'][0]
         forecastedIndexReturn = self.forecastIndexReturns["forecast"+str(self.ctx['forecastDays'])+"DIndexReturns"][0]
@@ -38,14 +39,13 @@ class SppSecurityForecastTask:
         print("SppSecurityForecastTask - Time taken:"+str(endT-startT)+" secs")
         return forecast
 
-    def invokeRegressor(self, securityDataForExchangeCodeForTraining:pd.DataFrame) ->pd.DataFrame:
-        regressor = self.ctx['regressor']
-        match regressor:
+    def invokeForecastor(self, securityDataForExchangeCodeForTraining: pd.DataFrame) -> pd.DataFrame:
+        forecastor = self.ctx['forecastor']
+        sppForecaster: SppForecaster = None
+        match forecastor:
             case "SppArima":
-                sppRegressor = SppArima.SppArima(securityDataForExchangeCodeForTraining, self.ctx, self.xtraDataPdf)
-                return sppRegressor.forecast()
+                sppForecaster = SppArima(securityDataForExchangeCodeForTraining, self.ctx, self.xtraDataPdf)
             case "SppDecisionTree":
-                sppRegressor = SppDecisionTree.SppDecisionTree(securityDataForExchangeCodeForTraining, self.ctx, self.xtraDataPdf)
-                return sppRegressor.forecast()
-            case default:
-                return None
+                sppForecaster = SppDecisionTree(securityDataForExchangeCodeForTraining, self.ctx, self.xtraDataPdf)
+
+        return sppForecaster.forecast()

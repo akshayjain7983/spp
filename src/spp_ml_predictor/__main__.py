@@ -19,14 +19,14 @@ def main(args):
     exchange = args[2]
     index = args[3]
     dataHistoryMonths = args[4]
-    regressor = args[5]
+    forecastor = args[5]
     exchangeCode = args[6] if len(args) >= 7 else None
 
     trainingDataDays = 30*int(dataHistoryMonths)
     trainingEndDate = pScoreDate
     trainingStartDate = datetime.strftime(datetime.strptime(trainingEndDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
 
-    for i in range(365):
+    for i in range(1):
         ctx = {'exchange': exchange
                , 'pScoreDate':pScoreDate
                , 'trainingStartDate': trainingStartDate
@@ -34,7 +34,7 @@ def main(args):
                , 'index': index
                , 'exchangeCode': exchangeCode
                , 'forecastDays': int(forecastDays)
-               , 'regressor': regressor}
+               , 'forecastor': forecastor}
 
         runSpp(ctx)
         pScoreDate = datetime.strftime(datetime.strptime(pScoreDate, '%Y-%m-%d') + timedelta(days=1), '%Y-%m-%d')

@@ -1,13 +1,12 @@
 import pandas as pd
 from datetime import datetime, date, timedelta
 import pmdarima as pm
+from ..trainer.SppForecaster import SppForecaster
 
-class SppArima:
+class SppArima(SppForecaster):
     def __init__(self, trainingDataPdf:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
+        super().__init__(trainingDataPdf, ctx, xtraDataPdf)
         self.name = "SppArima"
-        self.trainingDataPdf = trainingDataPdf
-        self.ctx = ctx
-        self.xtraDataPdf = xtraDataPdf
 
     def forecast(self) -> pd.DataFrame:
 

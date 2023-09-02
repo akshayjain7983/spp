@@ -7,7 +7,7 @@ from math import sqrt
 
 if __name__ == '__main__':
     mongoClient = MongoClient("mongodb://localhost:27017")
-    forecastPScoreMql = {"exchangeCode":"500086", "date":{"$gte":"2018-09-01", "$lte":"2019-08-31"}, "forecastPeriod":"30D", "lastUpdatedTimestamp":{"$gte":"2023-09-01"}, "forecastModel":"SppArima"}
+    forecastPScoreMql = {"exchangeCode":"500086", "date":{"$gte":"2018-09-01", "$lte":"2019-08-31"}, "forecastPeriod":"30D", "lastUpdatedTimestamp":{"$gte":"2023-09-01"}, "forecastModel":"SppDecisionTree"}
     forecastPScoreMongoResult = mongoClient['spp']['forecastPScore'].find(forecastPScoreMql)
     forecastPScorePd = pd.DataFrame(list(forecastPScoreMongoResult))
     forecastPScorePd = forecastPScorePd[['date', 'forecastedPScore', 'forecastedIndexReturn', 'forecastedSecurityReturn']]
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     plt.plot(trainingPScorePd['trainingPScore'], label='actualPScore')
     # plt.plot(trainingPScorePd['indexReturns'], label='actualIndexReturns')
     # plt.plot(trainingPScorePd['securityReturns'], label='actualSecurityReturns')
-    # plt.ylim(-10, 10)
+    plt.ylim(-100, 100)
     plt.legend()
 
     plt.show()
