@@ -67,6 +67,19 @@ class SppMLTrainingDao:
         results = self.mongoClient['spp'][indexReturnsCollection].find(indexReturnsMql_dict)
         return pd.DataFrame(list(results))
 
+    def loadIndexLevels(self, ctx) -> pd.DataFrame:
+        exchange = ctx['exchange']
+        trainingStartDate = ctx['trainingStartDate']
+        trainingEndDate = ctx['trainingEndDate']
+        index = ctx['index']
+
+        indexLevelsCollection = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL,"loadIndexLevelsCollectionName");
+        indexLevelsMql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL, "loadIndexLevelsMql");
+        indexLevelsMql = indexLevelsMql.format(exchange, index, trainingStartDate, trainingEndDate);
+        indexLevelsMql_dict = json.loads(indexLevelsMql)
+        results = self.mongoClient['spp'][indexLevelsCollection].find(indexLevelsMql_dict)
+        return pd.DataFrame(list(results))
+
     def loadSecurityTrainingPScore(self, exchangeCodesList, ctx) -> pd.DataFrame:
 
         exchange = ctx['exchange']
@@ -119,6 +132,43 @@ class SppMLTrainingDao:
         return inflationRates
 
 
-    def saveForecastPScore(self, forecastPScore:pd.DataFrame):
+    def saveForecastPScore(self, forecastPScore:pd.DataFrame, ctx:dict):
+
+        forecastDays = ctx['forecastDays']
+
+        forecastPScoreForUpsert = {
+            "exchange": forecastPScore["exchange"][forecastDays[0]],
+            "index": forecastPScore["index"][forecastDays[0]],
+            "exchangeCode": forecastPScore["exchangeCode"][forecastDays[0]],
+            "isin": forecastPScore["isin"][forecastDays[0]],
+            "date": forecastPScore["date"][forecastDays[0]],
+            "forecast.forecastModel": forecastPScore["forecastModel"][forecastDays[0]]
+        }
+
+        forecastPScoreWithPeriods = {}
+        forecastPScoreWithPeriods['forecastModel'] = forecastPScore["forecastModel"][forecastDays[0]]
+        for d in forecastDays:
+            forecastPScoreWithPeriods[forecastPScore['forecastPeriod'][d]] = {
+                "forecastDate": forecastPScore["forecastDate"][d],
+                "forecastedIndexReturn": forecastPScore["forecastedIndexReturn"][d],
+                "forecastedSecurityReturn": forecastPScore["forecastedSecurityReturn"][d],
+                "forecastedPScore": forecastPScore["forecastedPScore"][d],
+            }
+
+        forecastPScoreForSave = {
+            "$setOnInsert":{
+                "exchange": forecastPScore["exchange"][forecastDays[0]],
+                "index": forecastPScore["index"][forecastDays[0]],
+                "exchangeCode": forecastPScore["exchangeCode"][forecastDays[0]],
+                "isin": forecastPScore["isin"][forecastDays[0]],
+                "date": forecastPScore["date"][forecastDays[0]]
+            },
+            "$set":{
+                "lastUpdatedTimestamp": forecastPScore["lastUpdatedTimestamp"][forecastDays[0]],
+                "forecast":forecastPScoreWithPeriods
+            }
+
+        }
+
         forecastPScoreCollection = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL, "saveForecastPScoreCollectionName");
-        self.mongoClient['spp'][forecastPScoreCollection].insert_many(forecastPScore.to_dict(orient="records"))
+        self.mongoClient['spp'][forecastPScoreCollection].update_many(forecastPScoreForUpsert, forecastPScoreForSave, upsert=True)

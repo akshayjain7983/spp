@@ -12,49 +12,42 @@ class SppSecurityForecastTask(SppForecastTask):
         self.name = "SppSecurityForecastTask"
 
 
+    # def __preForecast__(self) -> pd.DataFrame:
+    #     securityDataForExchangeCodeForTraining = self.trainingDataForForecasting.rename(columns={"securityReturns90D": "value"})
+    #     return securityDataForExchangeCodeForTraining
+
     def __preForecast__(self) -> pd.DataFrame:
-        securityDataForExchangeCodeForTraining = self.trainingDataForForecasting.rename(columns={"securityReturns90D": "value"})
+        securityDataForExchangeCodeForTraining = self.trainingDataForForecasting.rename(columns={"close": "value"})
         return securityDataForExchangeCodeForTraining
 
     def __postForecast__(self, trainingDataForForecasting:pd.DataFrame, forecast:pd.DataFrame) -> pd.DataFrame:
-        forecastedSecurityReturn = forecast['value'][0]
-        forecastedIndexReturn = self.forecastIndexReturns["forecast" + str(self.ctx['forecastDays']) + "DIndexReturns"][0]
-        forecastedPScore = (forecastedSecurityReturn - forecastedIndexReturn) * 100
 
-        forecast.drop("value", axis=1, inplace=True)
-        forecast.insert(0, "exchange", trainingDataForForecasting['exchange'][0])
-        forecast.insert(1, "index", self.forecastIndexReturns['index'][0])
-        forecast.insert(2, "exchangeCode", trainingDataForForecasting['exchangeCode'][0])
-        forecast.insert(3, "isin", trainingDataForForecasting['isin'][0])
-        forecast.insert(4, "date", self.ctx['pScoreDate'])
-        forecast["forecastedIndexReturn"] = [forecastedIndexReturn]
-        forecast["forecastedSecurityReturn"] = [forecastedSecurityReturn]
-        forecast["forecastPeriod"] = [str(self.ctx['forecastDays']) + "D"]
-        forecast["forecastedPScore"] = [forecastedPScore]
-        forecast["lastUpdatedTimestamp"] = [datetime.strftime(datetime.now(timezone.utc), '%Y-%m-%dT%H:%M:%S%z')]
-        return forecast
+        forecastDays = self.ctx['forecastDays']
+        pScoreDate = datetime.strptime(self.ctx['pScoreDate'], '%Y-%m-%d')
+        securityPricePScoreDate = self.trainingDataForForecasting['close'][pScoreDate]
+        forecastResult = forecast.copy()
+        forecastResult.insert(loc=len(forecastResult.columns), column="forecastPeriod", value="")
+        forecastResult.insert(loc=len(forecastResult.columns), column="forecastDate", value="")
+        forecastResult.insert(loc=len(forecastResult.columns), column="forecastedIndexReturn", value=float('nan'))
+        forecastResult.insert(loc=len(forecastResult.columns), column="forecastedSecurityReturn", value=float('nan'))
+        forecastResult.insert(loc=len(forecastResult.columns), column="forecastedPScore", value=float('nan'))
+        forecastResult.drop("forecastValues", axis=1, inplace=True)
 
-    # def forecast(self) -> pd.DataFrame:
-    #
-    #     startT = time.time();
-    #     securityDataForExchangeCodeForTraining = self.securityDataForExchangeCode.rename(columns={"securityReturns90D": "value"})
-    #     forecast = super().__invokeForecastor__(securityDataForExchangeCodeForTraining)
-    #
-    #     forecastedSecurityReturn = forecast['value'][0]
-    #     forecastedIndexReturn = self.forecastIndexReturns["forecast"+str(self.ctx['forecastDays'])+"DIndexReturns"][0]
-    #     forecastedPScore = (forecastedSecurityReturn - forecastedIndexReturn) * 100
-    #
-    #     forecast.drop("value", axis=1, inplace=True)
-    #     forecast.insert(0, "exchange", securityDataForExchangeCodeForTraining['exchange'][0])
-    #     forecast.insert(1, "index", self.forecastIndexReturns['index'][0])
-    #     forecast.insert(2, "exchangeCode", securityDataForExchangeCodeForTraining['exchangeCode'][0])
-    #     forecast.insert(3, "isin", securityDataForExchangeCodeForTraining['isin'][0])
-    #     forecast.insert(4, "date", self.ctx['pScoreDate'])
-    #     forecast["forecastedIndexReturn"] = [forecastedIndexReturn]
-    #     forecast["forecastedSecurityReturn"] = [forecastedSecurityReturn]
-    #     forecast["forecastPeriod"] = [str(self.ctx['forecastDays'])+"D"]
-    #     forecast["forecastedPScore"] = [forecastedPScore]
-    #     forecast["lastUpdatedTimestamp"] = [datetime.strftime(datetime.now(timezone.utc), '%Y-%m-%dT%H:%M:%S%z')]
-    #     endT = time.time()
-    #     print("SppSecurityForecastTask - Time taken:"+str(endT-startT)+" secs")
-    #     return forecast
+        for d in forecastDays:
+            forecastedSecurityPrice = forecast['forecastValues'][d]['value']
+            forecastedSecurityReturn = forecastedSecurityPrice / securityPricePScoreDate - 1
+            forecastedIndexReturn = self.forecastIndexReturns['indexReturns'][d]
+            forecastedPScore = (forecastedSecurityReturn - forecastedIndexReturn) * 100
+            forecastResult.at[d, "forecastedIndexReturn"] = forecastedIndexReturn
+            forecastResult.at[d, "forecastedSecurityReturn"] = forecastedSecurityReturn
+            forecastResult.at[d, "forecastPeriod"] = forecast['forecastValues'][d]['forecastPeriod']
+            forecastResult.at[d, "forecastedPScore"] = forecastedPScore
+            forecastResult.at[d, "forecastDate"] = forecast['forecastValues'][d]['forecastDate']
+
+        forecastResult.insert(0, "exchange", trainingDataForForecasting['exchange'][0])
+        forecastResult.insert(1, "index", self.forecastIndexReturns['index'][forecastDays[0]])
+        forecastResult.insert(2, "exchangeCode", trainingDataForForecasting['exchangeCode'][0])
+        forecastResult.insert(3, "isin", trainingDataForForecasting['isin'][0])
+        forecastResult.insert(4, "date", self.ctx['pScoreDate'])
+        forecastResult.insert(5, "lastUpdatedTimestamp", datetime.strftime(datetime.now(timezone.utc), '%Y-%m-%dT%H:%M:%S%z'))
+        return forecastResult

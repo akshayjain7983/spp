@@ -13,81 +13,73 @@ class SppTrainer:
 
     def __submitForSppSecurityForecastTask__(self
                                              , forecastIndexReturns:pd.DataFrame
-                                             , securityReturnsPdf:pd.DataFrame
+                                             , securityPricesPdf:pd.DataFrame
                                              , interestRatesPdf:pd.DataFrame
                                              , inflationRatesPdf:pd.DataFrame) -> pd.DataFrame:
 
-        securityReturnsPdfLocal = securityReturnsPdf.copy()
-        securityReturnsPdfLocal['datetime'] = pd.to_datetime(securityReturnsPdfLocal['date'])
-        securityReturnsPdfLocal.set_index("datetime", inplace=True, drop=True)
-        securityReturnsPdfLocal.sort_index(inplace=True)
-        securityReturnsReindexPdf = pd.date_range(start=datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d'),
+        securityPricesPdfLocal = securityPricesPdf.copy()
+        securityPricesPdfLocal['datetime'] = pd.to_datetime(securityPricesPdfLocal['tradingDate'])
+        securityPricesPdfLocal.set_index("datetime", inplace=True, drop=True)
+        securityPricesPdfLocal.sort_index(inplace=True)
+        securityPricesReindexPdf = pd.date_range(start=datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d'),
                                                   end=datetime.strptime(self.ctx['pScoreDate'], '%Y-%m-%d'),
                                                   inclusive="both")
-        securityReturnsPdfLocal = securityReturnsPdfLocal.reindex(securityReturnsReindexPdf, method='ffill')
-        securityReturnsPdfLocal.dropna(inplace=True) #sometimes ffill with reindex may result in nan at begining so drop those
-        securityReturns90DSeries = [d.get('90D').get('return') for d in securityReturnsPdfLocal["returns"]]
-        securityReturnsPdfLocal.drop("returns", axis=1, inplace=True)
-        securityReturnsPdfLocal["securityReturns90D"] = securityReturns90DSeries
+        securityPricesPdfLocal = securityPricesPdfLocal.reindex(securityPricesReindexPdf, method='ffill')
+        securityPricesPdfLocal.dropna(inplace=True) #sometimes ffill with reindex may result in nan at begining so drop those
 
         xtraDataPdf = interestRatesPdf.drop(['_id', 'date', 'institution', 'rateType'], axis=1)
         xtraDataPdf.rename(columns={"rate": "repo"}, inplace=True)
         xtraDataPdf['inflation'] = inflationRatesPdf['rate']
 
-        sppTrainingTask = SppSecurityForecastTask(forecastIndexReturns, securityReturnsPdfLocal, self.ctx, xtraDataPdf)
+        sppTrainingTask = SppSecurityForecastTask(forecastIndexReturns, securityPricesPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
-        self.sppMLTrainingDao.saveForecastPScore(forecast)
+        self.sppMLTrainingDao.saveForecastPScore(forecast, self.ctx)
         return forecast;
 
     def __submitForSppIndexForecastTask__(self
-                                          , indexReturnsPdf:pd.DataFrame
+                                          , indexLevelsPdf:pd.DataFrame
                                           , interestRatesPdf:pd.DataFrame
                                           , inflationRatesPdf:pd.DataFrame) -> pd.DataFrame:
 
-        indexReturnsPdfLocal = indexReturnsPdf.copy()
-        indexReturnsPdfLocal['datetime'] = pd.to_datetime(indexReturnsPdfLocal['date'])
-        indexReturnsPdfLocal.set_index("datetime", inplace=True, drop=True)
-        indexReturnsPdfLocal.sort_index(inplace=True)
-        indexReturnsReindexPdf = pd.date_range(start=datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d'),
+        indexLevelsPdfLocal = indexLevelsPdf.copy()
+        indexLevelsPdfLocal['datetime'] = pd.to_datetime(indexLevelsPdfLocal['date'])
+        indexLevelsPdfLocal.set_index("datetime", inplace=True, drop=True)
+        indexLevelsPdfLocal.sort_index(inplace=True)
+        indexLevelsReindexPdf = pd.date_range(start=datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d'),
                                                end=datetime.strptime(self.ctx['pScoreDate'], '%Y-%m-%d'),
                                                inclusive="both")
-        indexReturnsPdfLocal = indexReturnsPdfLocal.reindex(indexReturnsReindexPdf, method='ffill')
-        indexReturnsPdfLocal.dropna(inplace=True) #sometimes ffill with reindex may result in nan at begining so drop those
-        indexReturns90DSeries = [d.get('90D').get('return') for d in indexReturnsPdfLocal["returns"]]
-        indexReturnsPdfLocal.drop("returns", axis=1, inplace=True)
-        indexReturnsPdfLocal["indexReturns90D"] = indexReturns90DSeries
+        indexLevelsPdfLocal = indexLevelsPdfLocal.reindex(indexLevelsReindexPdf, method='ffill')
+        indexLevelsPdfLocal.dropna(inplace=True) #sometimes ffill with reindex may result in nan at begining so drop those
 
         xtraDataPdf = interestRatesPdf.drop(['_id', 'date', 'institution', 'rateType'], axis=1)
         xtraDataPdf.rename(columns={"rate": "repo"}, inplace=True)
         xtraDataPdf['inflation'] = inflationRatesPdf['rate']
 
-
-        sppTrainingTask = SppIndexForecastTask(indexReturnsPdfLocal, self.ctx, xtraDataPdf)
+        sppTrainingTask = SppIndexForecastTask(indexLevelsPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
         return forecast;
 
     def train(self):
 
         startT = time.time()
-        indexReturnsPdf:pd.DataFrame = self.sppMLTrainingDao.loadIndexReturns(self.ctx)
         interestRatesPdf:pd.DataFrame = self.sppMLTrainingDao.loadInterestRates("Reserve Bank of India", "repo")
         interestRatesPdf = self.setupInterestRates(interestRatesPdf)
         inflationRatesPdf: pd.DataFrame = self.sppMLTrainingDao.loadInflationRates("Reserve Bank of India", "CPI - YoY - General")
         inflationRatesPdf = self.setupInflationRates(inflationRatesPdf)
-        forecastIndexReturns = self.__submitForSppIndexForecastTask__(indexReturnsPdf, interestRatesPdf, inflationRatesPdf)
+        indexLevelsPdf: pd.DataFrame = self.sppMLTrainingDao.loadIndexLevels(self.ctx)
+        forecastIndexReturns = self.__submitForSppIndexForecastTask__(indexLevelsPdf, interestRatesPdf, inflationRatesPdf)
 
         exchangeCodeDf:pd.DataFrame = self.sppMLTrainingDao.loadSecurityExchangeCodes(self.ctx)
         exchangeCodeDf = exchangeCodeDf[["exchangeCode"]].copy()
-        securityReturnsPdf:pd.DataFrame = self.sppMLTrainingDao.loadSecurityReturns(exchangeCodeDf['exchangeCode'], self.ctx)
-        # securityPricesPdf:pd.DataFrame = self.sppMLTrainingDao.loadSecurityPrices(exchangeCodeDf['exchangeCode'], self.ctx)
-        # securityVolumePdf = self.extractAndSetupSecurityTradeVolume(securityPricesPdf)
+        securityPricesPdf:pd.DataFrame = self.sppMLTrainingDao.loadSecurityPrices(exchangeCodeDf['exchangeCode'], self.ctx)
+
 
 
         futures = []
         with ThreadPoolExecutor(max_workers=8) as executor:
             for ec in exchangeCodeDf['exchangeCode']:
                 future = executor.submit(self.__submitForSppSecurityForecastTask__, forecastIndexReturns
-                                         , securityReturnsPdf[securityReturnsPdf['exchangeCode'] == ec]
+                                         , securityPricesPdf[securityPricesPdf['exchangeCode'] == ec]
                                          , interestRatesPdf, inflationRatesPdf)
                 futures.append(future)
 
@@ -102,7 +94,7 @@ class SppTrainer:
 
         startDate = datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d')
         endDate = datetime.strptime(self.ctx['trainingEndDate'], '%Y-%m-%d')
-        forecastDate = endDate + timedelta(days=self.ctx['forecastDays'])
+        forecastDate = endDate + timedelta(days=self.ctx['forecastDays'][-1])
 
         # firt get interest rates for training period
         interestRatesReindexPdf = pd.date_range(start=startDate, end=endDate, inclusive="both")
@@ -114,13 +106,19 @@ class SppTrainer:
         interestRatesReindexPdf = pd.date_range(start=startDate, end=forecastDate, inclusive="both")
         interestRatesPdf = interestRatesPdf.reindex(interestRatesReindexPdf, method='ffill')
         interestRatesPdf.sort_index(inplace=True)
+
+        # finally make rates as fractions
+        interestRatesPdf['rateFraction'] = interestRatesPdf['rate'] / 100
+        interestRatesPdf.drop(['rate'], axis=1, inplace=True)
+        interestRatesPdf.rename(columns={"rateFraction": "rate"}, inplace=True)
+
         return interestRatesPdf
 
     def setupInflationRates(self, inflationRatesPdf:pd.DataFrame) -> pd.DataFrame:
 
         startDate = datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d')
         endDate = datetime.strptime(self.ctx['trainingEndDate'], '%Y-%m-%d')
-        forecastDate = endDate + timedelta(days=self.ctx['forecastDays'])
+        forecastDate = endDate + timedelta(days=self.ctx['forecastDays'][-1])
 
         # firt get inflation rates for training period
         inflationRatesReindexPdf = pd.date_range(start=startDate, end=endDate, inclusive="both")
@@ -132,17 +130,10 @@ class SppTrainer:
         inflationRatesReindexPdf = pd.date_range(start=startDate, end=forecastDate, inclusive="both")
         inflationRatesPdf = inflationRatesPdf.reindex(inflationRatesReindexPdf, method='ffill')
         inflationRatesPdf.sort_index(inplace=True)
-        return inflationRatesPdf
 
-    # def extractAndSetupSecurityTradeVolume(self, securityPricesPdf: pd.DataFrame) -> pd.DataFrame:
-    #
-    #     securityPricesPdf['datetime'] = pd.to_datetime(securityPricesPdf['trainingDate'])
-    #     securityPricesPdf.set_index('datetime', drop=True, inplace=True)
-    #     securityPricesPdf.sort_index(inplace=True)
-    #     securityVolumePdf = securityPricesPdf[['trainingDate', 'exchangeCode', 'volume']].copy()
-    #     startDate = datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d')
-    #     endDate = datetime.strptime(self.ctx['trainingEndDate'], '%Y-%m-%d')
-    #     securityVolumeReindexPdf = pd.date_range(start=startDate, end=endDate, inclusive="both")
-    #     securityVolumePdf = securityVolumePdf.reindex(securityVolumeReindexPdf, fill_value=0)
-    #     securityVolumePdf.sort_index(inplace=True)
-    #     return securityVolumePdf
+        #finally make rates as fractions
+        inflationRatesPdf['rateFraction'] = inflationRatesPdf['rate']/100
+        inflationRatesPdf.drop(['rate'], axis=1, inplace=True)
+        inflationRatesPdf.rename(columns={"rateFraction": "rate"}, inplace=True)
+
+        return inflationRatesPdf

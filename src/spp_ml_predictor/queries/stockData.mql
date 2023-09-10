@@ -33,6 +33,20 @@ indexReturns
     }}
 }}
 
+
+<loadIndexLevelsCollectionName>
+indexLevels
+
+<loadIndexLevelsMql>
+{{
+    "exchange": "{}",
+    "index": "{}",
+    "date": {{
+      "$gte": "{}",
+      "$lte": "{}"
+    }}
+}}
+
 <loadSecurityAnalyticsCollectionName>
 securityAnalytics
 
@@ -55,19 +69,14 @@ securityAnalytics
 securityPrices
 
 <loadSecurityPricesMql>
-[
-  {{
-    $match:
-      {{
-        exchange: "{}",
-        date: {{
-          $gte: "{}",
-          $lte: "{}"
-        }},
-        exchangeCode: {{$in:[{}]}}
-      }}
-  }}
-]
+{{
+    "exchange": "{}",
+    "tradingDate": {{
+      "$gte": "{}",
+      "$lte": "{}"
+    }},
+    "exchangeCode": {{"$in":[{}]}}
+}}
 
 <loadSecurityTrainingPScoreCollectionName>
 trainingPScore

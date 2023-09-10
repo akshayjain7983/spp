@@ -15,7 +15,8 @@ def main(args):
     QueryFiles.load()
 
     pScoreDate = args[0]
-    forecastDays = args[1]
+    forecastDays = [int(e) for e in args[1].split(',')]
+    forecastDays.sort()
     exchange = args[2]
     index = args[3]
     dataHistoryMonths = args[4]
@@ -33,7 +34,7 @@ def main(args):
                , 'trainingEndDate': trainingEndDate
                , 'index': index
                , 'exchangeCode': exchangeCode
-               , 'forecastDays': int(forecastDays)
+               , 'forecastDays': forecastDays
                , 'forecastor': forecastor}
 
         runSpp(ctx)

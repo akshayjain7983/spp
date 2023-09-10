@@ -12,14 +12,12 @@ class SppArima(SppForecaster):
         return self.name
     def forecast(self) -> pd.DataFrame:
 
-        pScoreDate = self.ctx['pScoreDate']
         forecastDays = self.ctx['forecastDays']
         trainingData = self.trainingDataPdf['value']
-        endDate = datetime.strftime(datetime.strptime(pScoreDate, '%Y-%m-%d') + timedelta(days=forecastDays), '%Y-%m-%d')
         model = pm.auto_arima(trainingData, X=self.xtraDataPdf[self.xtraDataPdf.index.isin(trainingData.index)]
                               , start_p=1, start_q=1,
                                 test='adf',       # use adftest to find optimal 'd'
-                                max_p=forecastDays, max_q=forecastDays, # maximum p and q
+                                max_p=forecastDays[-1], max_q=forecastDays[-1], # maximum p and q
                                 m=1,              # frequency of series
                                 d=None,           # let model determine 'd'
                                 seasonal=False,   # No Seasonality
@@ -29,7 +27,12 @@ class SppArima(SppForecaster):
                                 error_action='ignore',
                                 suppress_warnings=True,
                                 stepwise=True)
-        forecast = model.predict(n_periods=forecastDays, X=self.xtraDataPdf[-forecastDays:])
-        value = forecast[forecast.shape[0]-1]
+        forecast = model.predict(n_periods=forecastDays[-1], X=self.xtraDataPdf[-(forecastDays[-1]):])
 
-        return pd.DataFrame({"forecastDate": endDate, "value": value, "forecastModel": self.__getName__()}, index=[0])
+        forecastValues = {
+            "forecastModel": self.__getName__(),
+            "forecastValues": [{"forecastPeriod": str(d) + 'D', "forecastDate": datetime.strftime(forecast.keys()[d - 1], '%Y-%m-%d'), "value": forecast[d - 1]} for d in forecastDays]
+        }
+
+
+        return pd.DataFrame(forecastValues, index=forecastDays)
