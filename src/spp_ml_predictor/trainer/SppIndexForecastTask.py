@@ -8,15 +8,14 @@ class SppIndexForecastTask(SppForecastTask):
         super().__init__(indexLevelsData, ctx, xtraDataPdf)
         self.name = "SppIndexForecastTask"
 
-    # def __preForecast__(self) -> pd.DataFrame:
-    #     indexReturnsDataForTraining = self.trainingDataForForecasting.rename(columns={"indexReturns90D": "value"})
-    #     return indexReturnsDataForTraining
-
     def __preForecast__(self) -> pd.DataFrame:
+        self.ctx['mode'] = 'index'
         indexReturnsDataForTraining = self.trainingDataForForecasting.rename(columns={"close": "value"})
         return indexReturnsDataForTraining
 
     def __postForecast__(self, trainingDataForForecasting:pd.DataFrame, forecast:pd.DataFrame) -> pd.DataFrame:
+
+        self.ctx['mode'] = None
         forecast.insert(0, "exchange", trainingDataForForecasting['exchange'][0])
         forecast.insert(1, "index", trainingDataForForecasting['index'][0])
         forecast.insert(2, "date", self.ctx['pScoreDate'])

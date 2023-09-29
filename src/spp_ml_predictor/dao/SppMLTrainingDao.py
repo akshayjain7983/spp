@@ -172,3 +172,20 @@ class SppMLTrainingDao:
 
         forecastPScoreCollection = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_MQL, "saveForecastPScoreCollectionName");
         self.mongoClient['spp'][forecastPScoreCollection].update_many(forecastPScoreForUpsert, forecastPScoreForSave, upsert=True)
+
+    def loadTrainingData(self, ctx:dict):
+
+        interestRatesPdf: pd.DataFrame = self.loadInterestRates("Reserve Bank of India", "repo")
+        inflationRatesPdf: pd.DataFrame = self.loadInflationRates("Reserve Bank of India","CPI - YoY - General")
+        indexLevelsPdf: pd.DataFrame = self.loadIndexLevels(ctx)
+        exchangeCodePdf: pd.DataFrame = self.loadSecurityExchangeCodes(ctx)
+        exchangeCodePdf = exchangeCodePdf[["exchangeCode"]].copy()
+        securityPricesPdf: pd.DataFrame = self.loadSecurityPrices(exchangeCodePdf['exchangeCode'], ctx)
+
+        return {
+            'interestRatesPdf': interestRatesPdf
+            , 'inflationRatesPdf': inflationRatesPdf
+            , 'exchangeCodePdf': exchangeCodePdf
+            , 'indexLevelsPdf': indexLevelsPdf
+            , 'securityPricesPdf': securityPricesPdf
+        }

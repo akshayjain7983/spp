@@ -27,9 +27,10 @@ class SppTrainer:
         securityPricesPdfLocal = securityPricesPdfLocal.reindex(securityPricesReindexPdf, method='ffill')
         securityPricesPdfLocal.dropna(inplace=True) #sometimes ffill with reindex may result in nan at begining so drop those
 
-        xtraDataPdf = interestRatesPdf.drop(['_id', 'date', 'institution', 'rateType'], axis=1)
+        xtraDataPdf:pd.DataFrame = interestRatesPdf.drop(['_id', 'date', 'institution', 'rateType'], axis=1)
         xtraDataPdf.rename(columns={"rate": "repo"}, inplace=True)
         xtraDataPdf['inflation'] = inflationRatesPdf['rate']
+        xtraDataPdf['candleStickRealBodyChange'] = securityPricesPdfLocal['candleStickRealBodyChange']
 
         sppTrainingTask = SppSecurityForecastTask(forecastIndexReturns, securityPricesPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
@@ -59,25 +60,26 @@ class SppTrainer:
         forecast = sppTrainingTask.forecast()
         return forecast;
 
+
     def train(self):
 
         startT = time.time()
-        interestRatesPdf:pd.DataFrame = self.sppMLTrainingDao.loadInterestRates("Reserve Bank of India", "repo")
-        interestRatesPdf = self.setupInterestRates(interestRatesPdf)
-        inflationRatesPdf: pd.DataFrame = self.sppMLTrainingDao.loadInflationRates("Reserve Bank of India", "CPI - YoY - General")
-        inflationRatesPdf = self.setupInflationRates(inflationRatesPdf)
-        indexLevelsPdf: pd.DataFrame = self.sppMLTrainingDao.loadIndexLevels(self.ctx)
+
+        trainingDataForTraining:dict = self.ctx['trainingDataForTraining']
+        indexLevelsPdf = trainingDataForTraining['indexLevelsPdf']
+        securityPricesPdf = trainingDataForTraining['securityPricesPdf']
+        interestRatesPdf = trainingDataForTraining['interestRatesPdf']
+        inflationRatesPdf = trainingDataForTraining['inflationRatesPdf']
+        exchangeCodePdf = trainingDataForTraining['exchangeCodePdf']
+
         forecastIndexReturns = self.__submitForSppIndexForecastTask__(indexLevelsPdf, interestRatesPdf, inflationRatesPdf)
-
-        exchangeCodeDf:pd.DataFrame = self.sppMLTrainingDao.loadSecurityExchangeCodes(self.ctx)
-        exchangeCodeDf = exchangeCodeDf[["exchangeCode"]].copy()
-        securityPricesPdf:pd.DataFrame = self.sppMLTrainingDao.loadSecurityPrices(exchangeCodeDf['exchangeCode'], self.ctx)
-
+        interestRatesPdf = self.setupInterestRates(interestRatesPdf)
+        inflationRatesPdf = self.setupInflationRates(inflationRatesPdf)
 
 
         futures = []
         with ThreadPoolExecutor(max_workers=8) as executor:
-            for ec in exchangeCodeDf['exchangeCode']:
+            for ec in exchangeCodePdf['exchangeCode']:
                 future = executor.submit(self.__submitForSppSecurityForecastTask__, forecastIndexReturns
                                          , securityPricesPdf[securityPricesPdf['exchangeCode'] == ec]
                                          , interestRatesPdf, inflationRatesPdf)

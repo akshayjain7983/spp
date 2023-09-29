@@ -6,7 +6,7 @@ import numpy as np
 class SppMLForecaster(SppForecaster):
     def __init__(self, trainingDataPdf:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
         super().__init__(trainingDataPdf, ctx, xtraDataPdf)
-        self.lags = int(self.ctx['forecastDays'][-1]/6)
+        self.lags = 15
 
 
     def forecast(self) -> pd.DataFrame:

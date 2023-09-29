@@ -8,7 +8,7 @@ from math import sqrt
 if __name__ == '__main__':
     forecastPeriod = [30]
     mongoClient = MongoClient("mongodb://localhost:27017")
-    forecastModel = "SppPolyRidge"
+    forecastModel = "SppAdaBoost"
     exchangeCode = "509488"
     dateStart = "2018-09-01"
     dateEnd = "2019-08-31"
@@ -34,7 +34,7 @@ if __name__ == '__main__':
         forecastPScorePdForPeriodSeries = [d.get(fp).get('forecastedPScore') for d in forecastPScorePdForPeriod["forecast"]]
         forecastIndexReturnPdForPeriodSeries = [d.get(fp).get('forecastedIndexReturn') for d in forecastPScorePdForPeriod["forecast"]]
         forecastSecurityReturnPdForPeriodSeries = [d.get(fp).get('forecastedSecurityReturn') for d in forecastPScorePdForPeriod["forecast"]]
-        forecastPScorePdForPeriod["forecastedPScore"] = forecastPScorePdForPeriodSeries
+        forecastPScorePdForPeriod["forecastedPScore"] = [v for v in forecastPScorePdForPeriodSeries]
         forecastPScorePdForPeriod["forecastedIndexReturn"] = [v*100 for v in forecastIndexReturnPdForPeriodSeries]
         forecastPScorePdForPeriod["forecastedSecurityReturn"] = [v*100 for v in forecastSecurityReturnPdForPeriodSeries]
         forecastPScorePdForPeriod['datetime'] = pd.to_datetime(forecastPScorePdForPeriod['date'])
@@ -67,10 +67,10 @@ if __name__ == '__main__':
         plt.plot(trainingPScorePdForPeriod['trainingPScore'], label=('actualPScore'+fp))
         # plt.plot(trainingPScorePdForPeriod['indexReturns'], label=('actualIndexReturns'+fp))
         # plt.plot(trainingPScorePdForPeriod['securityReturns'], label=('actualSecurityReturns'+fp))
-        y = 85 if c == 0 else 80 if c == 1 else 75
+        y = 85 if c == 0 else 70 if c == 1 else 55
         plt.text(datetime.strptime(dateStart, '%Y-%m-%d'), y, "RMSE PScore {} = {}".format(fp, str(rmsePscore)), fontsize = 10)
-        # plt.text(datetime.strptime(dateStart, '%Y-%m-%d'), y, "RMSE Index Returns {} = {}".format(fp, str(rmseIndexReturns)), fontsize = 10)
-        # plt.text(datetime.strptime(dateStart, '%Y-%m-%d'), y, "RMSE Security Returns {} = {}".format(fp, str(rmseSecurityReturns)), fontsize = 10)
+        # plt.text(datetime.strptime(dateStart, '%Y-%m-%d'), (y-5), "RMSE Index Returns {} = {}".format(fp, str(rmseIndexReturns)), fontsize = 10)
+        # plt.text(datetime.strptime(dateStart, '%Y-%m-%d'), (y-10), "RMSE Security Returns {} = {}".format(fp, str(rmseSecurityReturns)), fontsize = 10)
 
     plt.xlabel("Time", fontsize=15)
     plt.ylabel("PScore", fontsize=15)

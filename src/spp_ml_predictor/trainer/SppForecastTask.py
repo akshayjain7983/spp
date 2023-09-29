@@ -6,6 +6,9 @@ from ..trainer.SppForecaster import SppForecaster
 from ..trainer.SppRandomForests import SppRandomForests
 from ..trainer.SppRidge import SppRidge
 from ..trainer.SppPolyRidge import SppPolyRidge
+from ..trainer.SppAdaBoost import SppAdaBoost
+from ..trainer.SppVotingForecaster import SppVotingForecaster
+from ..trainer.SppGradientBoost import SppGradientBoost
 
 class SppForecastTask:
     def __init__(self, trainingDataForForecasting:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
@@ -27,6 +30,12 @@ class SppForecastTask:
                 sppForecaster = SppRidge(trainingData, self.ctx, self.xtraDataPdf)
             case "SppPolyRidge":
                 sppForecaster = SppPolyRidge(trainingData, self.ctx, self.xtraDataPdf)
+            case "SppAdaBoost":
+                sppForecaster = SppAdaBoost(trainingData, self.ctx, self.xtraDataPdf)
+            case "SppVotingForecaster":
+                sppForecaster = SppVotingForecaster(trainingData, self.ctx, self.xtraDataPdf)
+            case "SppGradientBoost":
+                sppForecaster = SppGradientBoost(trainingData, self.ctx, self.xtraDataPdf)
 
         return sppForecaster.forecast()
 
