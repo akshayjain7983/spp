@@ -1,5 +1,5 @@
 import pandas as pd
-from ..trainer import SppMLForecaster
+from ..trainer.SppMLForecaster import SppMLForecaster
 from sklearn.ensemble import GradientBoostingRegressor
 
 class SppGradientBoost(SppMLForecaster):

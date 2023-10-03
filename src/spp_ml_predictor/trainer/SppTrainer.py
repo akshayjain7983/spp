@@ -55,6 +55,7 @@ class SppTrainer:
         xtraDataPdf = interestRatesPdf.drop(['_id', 'date', 'institution', 'rateType'], axis=1)
         xtraDataPdf.rename(columns={"rate": "repo"}, inplace=True)
         xtraDataPdf['inflation'] = inflationRatesPdf['rate']
+        xtraDataPdf['candleStickRealBodyChange'] = indexLevelsPdfLocal['candleStickRealBodyChange']
 
         sppTrainingTask = SppIndexForecastTask(indexLevelsPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
@@ -87,7 +88,10 @@ class SppTrainer:
 
 
         for f in futures:
-            print(f.result())
+            try:
+                print(f.result())
+            except Exception:
+                print(f.exception())
 
         endT = time.time()
         print("SppTrainer - "+self.ctx['pScoreDate']+" - Time taken:" + str(endT - startT) + " secs")

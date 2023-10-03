@@ -10,6 +10,7 @@ class SppIndexForecastTask(SppForecastTask):
 
     def __preForecast__(self) -> pd.DataFrame:
         self.ctx['mode'] = 'index'
+        super().__setupCandlestickPatternLags__()
         indexReturnsDataForTraining = self.trainingDataForForecasting.rename(columns={"close": "value"})
         return indexReturnsDataForTraining
 

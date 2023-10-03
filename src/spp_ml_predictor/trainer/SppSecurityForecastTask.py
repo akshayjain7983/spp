@@ -12,19 +12,9 @@ class SppSecurityForecastTask(SppForecastTask):
         self.name = "SppSecurityForecastTask"
 
     def __preForecast__(self) -> pd.DataFrame:
-        self.__setupCandlestickPatternLags__()
+        super().__setupCandlestickPatternLags__()
         securityDataForExchangeCodeForTraining = self.trainingDataForForecasting.rename(columns={"close": "value"})
         return securityDataForExchangeCodeForTraining
-
-    def __setupCandlestickPatternLags__(self):
-
-        candleStickLags = 5
-        for i in range(1, candleStickLags):
-            self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'] = self.xtraDataPdf['candleStickRealBodyChange'].shift(i)
-            self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'].ffill(limit=(candleStickLags-i), inplace=True)
-            self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'].replace(to_replace=float('NaN'), value=0.0, inplace=True)
-        self.xtraDataPdf['candleStickRealBodyChange'].ffill(limit=candleStickLags, inplace=True)
-        self.xtraDataPdf['candleStickRealBodyChange'].replace(to_replace=float('NaN'), value=0.0, inplace=True)
 
     def __postForecast__(self, trainingDataForForecasting:pd.DataFrame, forecast:pd.DataFrame) -> pd.DataFrame:
 

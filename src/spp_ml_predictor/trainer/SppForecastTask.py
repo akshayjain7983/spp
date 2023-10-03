@@ -9,6 +9,10 @@ from ..trainer.SppPolyRidge import SppPolyRidge
 from ..trainer.SppAdaBoost import SppAdaBoost
 from ..trainer.SppVotingForecaster import SppVotingForecaster
 from ..trainer.SppGradientBoost import SppGradientBoost
+from ..trainer.SppXGBoost import SppXGBoost
+from ..trainer.SppStackingForecastor import SppStackingForecastor
+from ..trainer.SppSvm import SppSvm
+from ..trainer.SppExtraTrees import SppExtraTrees
 
 class SppForecastTask:
     def __init__(self, trainingDataForForecasting:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
@@ -30,12 +34,20 @@ class SppForecastTask:
                 sppForecaster = SppRidge(trainingData, self.ctx, self.xtraDataPdf)
             case "SppPolyRidge":
                 sppForecaster = SppPolyRidge(trainingData, self.ctx, self.xtraDataPdf)
+            case "SppSvm":
+                sppForecaster = SppSvm(trainingData, self.ctx, self.xtraDataPdf)
             case "SppAdaBoost":
                 sppForecaster = SppAdaBoost(trainingData, self.ctx, self.xtraDataPdf)
             case "SppVotingForecaster":
                 sppForecaster = SppVotingForecaster(trainingData, self.ctx, self.xtraDataPdf)
             case "SppGradientBoost":
                 sppForecaster = SppGradientBoost(trainingData, self.ctx, self.xtraDataPdf)
+            case "SppStackingForecastor":
+                sppForecaster = SppStackingForecastor(trainingData, self.ctx, self.xtraDataPdf)
+            case "SppXGBoost":
+                sppForecaster = SppXGBoost(trainingData, self.ctx, self.xtraDataPdf)
+            case "SppExtraTrees":
+                sppForecaster = SppExtraTrees(trainingData, self.ctx, self.xtraDataPdf)
 
         return sppForecaster.forecast()
 
@@ -50,3 +62,13 @@ class SppForecastTask:
         forecast = self.__invokeForecastor__(trainingData)
         finalForecastResult = self.__postForecast__(trainingData, forecast)
         return finalForecastResult
+
+    def __setupCandlestickPatternLags__(self):
+
+        candleStickLags = 5
+        for i in range(1, candleStickLags):
+            self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'] = self.xtraDataPdf['candleStickRealBodyChange'].shift(i)
+            self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'].ffill(limit=(candleStickLags-i), inplace=True)
+            self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'].replace(to_replace=float('NaN'), value=0.0, inplace=True)
+        self.xtraDataPdf['candleStickRealBodyChange'].ffill(limit=candleStickLags, inplace=True)
+        self.xtraDataPdf['candleStickRealBodyChange'].replace(to_replace=float('NaN'), value=0.0, inplace=True)

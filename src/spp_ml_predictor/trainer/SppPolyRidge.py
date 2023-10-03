@@ -19,11 +19,11 @@ class SppPolyRidge(SppMLForecaster):
 
     def __getRegressor__(self, train_features: pd.DataFrame, train_labels: pd.DataFrame):
 
-        train_features_poly = self.poly_features.fit_transform(train_features)
+        train_features_poly = self.poly_features.fit_transform(train_features, train_labels)
         dtr = Ridge(alpha=0.00001, solver="auto")
         dtr.fit(train_features_poly, train_labels)
         return dtr
 
     def __preparePredFeatures__(self, pred_features:pd.DataFrame):
-        pred_features_poly = self.poly_features.fit_transform(pred_features)
+        pred_features_poly = self.poly_features.transform(pred_features)
         return pred_features_poly
