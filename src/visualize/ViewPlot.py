@@ -8,8 +8,8 @@ from math import sqrt
 if __name__ == '__main__':
     forecastPeriod = [30]
     mongoClient = MongoClient("mongodb://localhost:27017")
-    forecastModel = "SppRandomForests"
-    exchangeCode = "500086"
+    forecastModel = "SppVotingForecaster"
+    exchangeCode = "509488"
     dateStart = "2018-09-01"
     dateEnd = "2019-08-31"
 
