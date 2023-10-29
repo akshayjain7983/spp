@@ -3,9 +3,10 @@ from ..trainer.SppMLForecaster import SppMLForecaster
 from sklearn.ensemble import AdaBoostRegressor, VotingRegressor, RandomForestRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.preprocessing import PolynomialFeatures, StandardScaler
-from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import RidgeCV, ElasticNet, SGDRegressor
 from sklearn.pipeline import Pipeline
 from xgboost import XGBRegressor
+from sklearn.svm import SVR
 
 class SppVotingForecaster(SppMLForecaster):
     def __init__(self, trainingDataPdf:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
@@ -28,13 +29,17 @@ class SppVotingForecaster(SppMLForecaster):
         # dtrXgBoost = XGBRegressor(n_estimators=200, max_depth=train_features.shape[1], random_state=train_features.shape[1]
         #                    , learning_rate=0.1, booster='gbtree', tree_method='approx')
 
-        dtr2 = RidgeCV(alphas=[1e-3, 1e-2, 1e-1], cv=5)
-        rf1 = RandomForestRegressor(n_estimators=25, max_depth=6, random_state=10, min_impurity_decrease=0.00001)
-        rf2 = RandomForestRegressor(n_estimators=25, max_depth=12, random_state=11, min_impurity_decrease=0.000001)
-        rf3 = RandomForestRegressor(n_estimators=25, max_depth=24, random_state=12, min_impurity_decrease=0.0000001)
-        rf4 = RandomForestRegressor(n_estimators=25, max_depth=48, random_state=13, min_impurity_decrease=0.00000001)
-        dtr = VotingRegressor(estimators=[('rf1', rf1), ('rf2', rf2), ('rf3', rf3), ('rf4', rf4), ('lr', dtr2)], weights=[0.155, 0.165, 0.175, 0.185, 0.32], n_jobs=-1)
+        r1 = RidgeCV(alphas=[1e-3, 1e-2, 1e-1], cv=5)
+        r2 = RandomForestRegressor(n_estimators=500, max_depth=train_features.shape[1], random_state=train_features.shape[1], min_impurity_decrease=0.0000001)
+        r3 = SGDRegressor(max_iter=1000, tol=1e-3, penalty=None, eta0=0.1)
+        r4 = XGBRegressor(n_estimators=500, max_depth=train_features.shape[1], random_state=train_features.shape[1], learning_rate=0.1, booster='gbtree', tree_method='approx')
 
+        # rf1 = RandomForestRegressor(n_estimators=25, max_depth=6, random_state=10, min_impurity_decrease=0.00001)
+        # rf2 = RandomForestRegressor(n_estimators=25, max_depth=12, random_state=11, min_impurity_decrease=0.000001)
+        # rf3 = RandomForestRegressor(n_estimators=25, max_depth=24, random_state=12, min_impurity_decrease=0.0000001)
+        # rf4 = RandomForestRegressor(n_estimators=25, max_depth=48, random_state=13, min_impurity_decrease=0.00000001)
+        # dtr = VotingRegressor(estimators=[('rf1', rf1), ('rf2', rf2), ('rf3', rf3), ('rf4', rf4), ('lr', dtr2)], n_jobs=-1)
+        dtr = VotingRegressor(estimators=[('r1', r1), ('r2', r2), ('r3', r3), ('r4', r4)], weights=[1, 8, 1, 4], n_jobs=-1)
         dtr.fit(train_features, train_labels)
         return dtr
 

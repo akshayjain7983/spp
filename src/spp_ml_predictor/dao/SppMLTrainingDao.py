@@ -137,17 +137,17 @@ class SppMLTrainingDao:
         forecastDays = ctx['forecastDays']
 
         forecastPScoreForUpsert = {
-            "exchange": forecastPScore["exchange"][forecastDays[0]],
-            "index": forecastPScore["index"][forecastDays[0]],
-            "exchangeCode": forecastPScore["exchangeCode"][forecastDays[0]],
-            "isin": forecastPScore["isin"][forecastDays[0]],
-            "date": forecastPScore["date"][forecastDays[0]],
-            "forecast.forecastModel": forecastPScore["forecastModel"][forecastDays[0]]
+            "exchange": forecastPScore["exchange"][forecastDays[1]],
+            "index": forecastPScore["index"][forecastDays[1]],
+            "exchangeCode": forecastPScore["exchangeCode"][forecastDays[1]],
+            "isin": forecastPScore["isin"][forecastDays[1]],
+            "date": forecastPScore["date"][forecastDays[1]],
+            "forecast.forecastModel": forecastPScore["forecastModel"][forecastDays[1]]
         }
 
         forecastPScoreWithPeriods = {}
-        forecastPScoreWithPeriods['forecastModel'] = forecastPScore["forecastModel"][forecastDays[0]]
-        for d in forecastDays:
+        forecastPScoreWithPeriods['forecastModel'] = forecastPScore["forecastModel"][forecastDays[1]]
+        for d in forecastDays[1:]:
             forecastPScoreWithPeriods[forecastPScore['forecastPeriod'][d]] = {
                 "forecastDate": forecastPScore["forecastDate"][d],
                 "forecastedIndexReturn": forecastPScore["forecastedIndexReturn"][d],
@@ -157,14 +157,14 @@ class SppMLTrainingDao:
 
         forecastPScoreForSave = {
             "$setOnInsert":{
-                "exchange": forecastPScore["exchange"][forecastDays[0]],
-                "index": forecastPScore["index"][forecastDays[0]],
-                "exchangeCode": forecastPScore["exchangeCode"][forecastDays[0]],
-                "isin": forecastPScore["isin"][forecastDays[0]],
-                "date": forecastPScore["date"][forecastDays[0]]
+                "exchange": forecastPScore["exchange"][forecastDays[1]],
+                "index": forecastPScore["index"][forecastDays[1]],
+                "exchangeCode": forecastPScore["exchangeCode"][forecastDays[1]],
+                "isin": forecastPScore["isin"][forecastDays[1]],
+                "date": forecastPScore["date"][forecastDays[1]]
             },
             "$set":{
-                "lastUpdatedTimestamp": forecastPScore["lastUpdatedTimestamp"][forecastDays[0]],
+                "lastUpdatedTimestamp": forecastPScore["lastUpdatedTimestamp"][forecastDays[1]],
                 "forecast":forecastPScoreWithPeriods
             }
 

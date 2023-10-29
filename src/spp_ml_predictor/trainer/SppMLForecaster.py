@@ -43,9 +43,14 @@ class SppMLForecaster(SppForecaster):
 
     def __preparePredFeatures__(self, pred_features:pd.DataFrame):
         return pred_features
+
+    def __predict__(self, regressor, pred_features:pd.DataFrame):
+        return regressor.predict(pred_features)
+
     def __buildAndForecast__(self, trainingData:pd.DataFrame) -> pd.DataFrame:
 
         endDate = datetime.strptime(self.ctx['trainingEndDate'], '%Y-%m-%d')
+        endDate = endDate - timedelta(days=1)
         nextForecastDate = endDate + timedelta(days=1)
         forecastDays = self.ctx['forecastDays']
         train = trainingData[:endDate].copy()
@@ -58,12 +63,12 @@ class SppMLForecaster(SppForecaster):
 
         dtr = self.__getRegressor__(train_features, train_labels)
 
-        for i in range(forecastDays[-1]):
+        for i in range(forecastDays[-1]+1):
             pred_features = pred.filter(items=[nextForecastDate], axis=0)[[f'value_lag_log_diff_{i+2}' for i in range(self.lags-1)]]
             xtraDataPdfPred = self.xtraDataPdf[self.xtraDataPdf.index.isin(pred_features.index)]
             pred_features = pd.concat([pred_features, xtraDataPdfPred], axis=1)
             pred_features = self.__preparePredFeatures__(pred_features)
-            pred_labels = dtr.predict(pred_features)
+            pred_labels = self.__predict__(dtr, pred_features)
             nextForecastValueLagLogDiff1 = pred_labels[0]
             nextForecastValueLagLog1 = pred['value_lag_log_1'][nextForecastDate]
             nextForecastValueLagLog = nextForecastValueLagLog1 + nextForecastValueLagLogDiff1
@@ -78,7 +83,7 @@ class SppMLForecaster(SppForecaster):
 
         forecastValues = {
             "forecastModel": self.__getName__(),
-            "forecastValues": [{"forecastPeriod": str(d) + 'D', "forecastDate": datetime.strftime(pred.index[d - 1], '%Y-%m-%d'), "value": pred['value_lag_0'][d - 1]} for d in forecastDays]
+            "forecastValues": [{"forecastPeriod": str(d) + 'D', "forecastDate": datetime.strftime(pred.index[d], '%Y-%m-%d'), "value": pred['value_lag_0'][d]} for d in forecastDays]
         }
 
         return pd.DataFrame(forecastValues, index=forecastDays)

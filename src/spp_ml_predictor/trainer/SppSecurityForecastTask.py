@@ -19,9 +19,9 @@ class SppSecurityForecastTask(SppForecastTask):
     def __postForecast__(self, trainingDataForForecasting:pd.DataFrame, forecast:pd.DataFrame) -> pd.DataFrame:
 
         forecastDays = self.ctx['forecastDays']
-        pScoreDate = datetime.strptime(self.ctx['pScoreDate'], '%Y-%m-%d')
-        securityPricePScoreDate = self.trainingDataForForecasting['close'][pScoreDate]
+        securityPricePScoreDate = forecast['forecastValues'][0]['value']
         forecastResult = forecast.copy()
+        forecastResult.drop(index=0, inplace=True)
         forecastResult.insert(loc=len(forecastResult.columns), column="forecastPeriod", value="")
         forecastResult.insert(loc=len(forecastResult.columns), column="forecastDate", value="")
         forecastResult.insert(loc=len(forecastResult.columns), column="forecastedIndexReturn", value=float('nan'))
@@ -29,7 +29,7 @@ class SppSecurityForecastTask(SppForecastTask):
         forecastResult.insert(loc=len(forecastResult.columns), column="forecastedPScore", value=float('nan'))
         forecastResult.drop("forecastValues", axis=1, inplace=True)
 
-        for d in forecastDays:
+        for d in forecastDays[1:]:
             forecastedSecurityPrice = forecast['forecastValues'][d]['value']
             forecastedSecurityReturn = forecastedSecurityPrice / securityPricePScoreDate - 1
             forecastedIndexReturn = self.forecastIndexReturns['indexReturns'][d]
@@ -41,7 +41,7 @@ class SppSecurityForecastTask(SppForecastTask):
             forecastResult.at[d, "forecastDate"] = forecast['forecastValues'][d]['forecastDate']
 
         forecastResult.insert(0, "exchange", trainingDataForForecasting['exchange'][0])
-        forecastResult.insert(1, "index", self.forecastIndexReturns['index'][forecastDays[0]])
+        forecastResult.insert(1, "index", self.forecastIndexReturns['index'][forecastDays[1]])
         forecastResult.insert(2, "exchangeCode", trainingDataForForecasting['exchangeCode'][0])
         forecastResult.insert(3, "isin", trainingDataForForecasting['isin'][0])
         forecastResult.insert(4, "date", self.ctx['pScoreDate'])

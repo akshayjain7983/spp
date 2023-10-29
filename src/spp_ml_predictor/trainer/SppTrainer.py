@@ -73,9 +73,9 @@ class SppTrainer:
         inflationRatesPdf = trainingDataForTraining['inflationRatesPdf']
         exchangeCodePdf = trainingDataForTraining['exchangeCodePdf']
 
-        forecastIndexReturns = self.__submitForSppIndexForecastTask__(indexLevelsPdf, interestRatesPdf, inflationRatesPdf)
         interestRatesPdf = self.setupInterestRates(interestRatesPdf)
         inflationRatesPdf = self.setupInflationRates(inflationRatesPdf)
+        forecastIndexReturns = self.__submitForSppIndexForecastTask__(indexLevelsPdf, interestRatesPdf, inflationRatesPdf)
 
 
         futures = []

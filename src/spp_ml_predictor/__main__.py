@@ -32,6 +32,7 @@ def main(args):
     pScoreStartDate = args[0]
     pScoreEndDate = args[1]
     forecastDays = [int(e) for e in args[2].split(',')]
+    forecastDays.append(0)
     forecastDays.sort()
     exchange = args[3]
     index = args[4]
@@ -59,26 +60,30 @@ def main(args):
     pScoreEndDate = datetime.strptime(pScoreEndDate, '%Y-%m-%d')
 
     futures = []
+    modelCache = {}
+    # with ThreadPoolExecutor(max_workers=4) as executor:
+    for d in rrule(DAILY, dtstart=pScoreStartDate, until=pScoreEndDate):
+        pScoreDate = datetime.strftime(d, '%Y-%m-%d')
+        trainingEndDate = pScoreDate
+        trainingStartDate = datetime.strftime(datetime.strptime(trainingEndDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
+        trainingDataForTraining = extractTrainingData(trainingData, trainingStartDate, trainingEndDate)
+        ctx = {'exchange': exchange
+            , 'pScoreDate': pScoreDate
+            , 'trainingStartDate': trainingStartDate
+            , 'trainingEndDate': trainingEndDate
+            , 'index': index
+            , 'exchangeCode': exchangeCode
+            , 'forecastDays': forecastDays
+            , 'forecastor': forecastor
+            , 'trainingDataForTraining': trainingDataForTraining
+            , 'cacheAndRetrainModel': True
+            , 'modelCache':modelCache}
+        runSpp(ctx, sppMLTrainingDao)
+        modelCache = ctx['modelCache']
+            # f = executor.submit(runSpp, ctx, sppMLTrainingDao)
+            # futures.append(f)
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        for d in rrule(DAILY, dtstart=pScoreStartDate, until=pScoreEndDate):
-            pScoreDate = datetime.strftime(d, '%Y-%m-%d')
-            trainingEndDate = pScoreDate
-            trainingStartDate = datetime.strftime(datetime.strptime(trainingEndDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
-            trainingDataForTraining = extractTrainingData(trainingData, trainingStartDate, trainingEndDate)
-            ctx = {'exchange': exchange
-                , 'pScoreDate': pScoreDate
-                , 'trainingStartDate': trainingStartDate
-                , 'trainingEndDate': trainingEndDate
-                , 'index': index
-                , 'exchangeCode': exchangeCode
-                , 'forecastDays': forecastDays
-                , 'forecastor': forecastor
-                , 'trainingDataForTraining': trainingDataForTraining}
-            f = executor.submit(runSpp, ctx, sppMLTrainingDao)
-            futures.append(f)
-
-    executor.shutdown()
+    # executor.shutdown()
 
 if __name__ == '__main__':
     main(sys.argv[1:])

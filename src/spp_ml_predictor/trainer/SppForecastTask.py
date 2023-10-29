@@ -13,6 +13,7 @@ from ..trainer.SppXGBoost import SppXGBoost
 from ..trainer.SppStackingForecastor import SppStackingForecastor
 from ..trainer.SppSvm import SppSvm
 from ..trainer.SppExtraTrees import SppExtraTrees
+from ..trainer.SppNN import SppNN
 
 class SppForecastTask:
     def __init__(self, trainingDataForForecasting:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
@@ -48,6 +49,9 @@ class SppForecastTask:
                 sppForecaster = SppXGBoost(trainingData, self.ctx, self.xtraDataPdf)
             case "SppExtraTrees":
                 sppForecaster = SppExtraTrees(trainingData, self.ctx, self.xtraDataPdf)
+            case "SppNN":
+                sppForecaster = SppNN(trainingData, self.ctx, self.xtraDataPdf)
+
 
         return sppForecaster.forecast()
 

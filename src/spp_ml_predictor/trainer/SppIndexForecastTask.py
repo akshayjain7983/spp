@@ -17,15 +17,16 @@ class SppIndexForecastTask(SppForecastTask):
     def __postForecast__(self, trainingDataForForecasting:pd.DataFrame, forecast:pd.DataFrame) -> pd.DataFrame:
 
         self.ctx['mode'] = None
-        forecast.insert(0, "exchange", trainingDataForForecasting['exchange'][0])
-        forecast.insert(1, "index", trainingDataForForecasting['index'][0])
-        forecast.insert(2, "date", self.ctx['pScoreDate'])
+        forecastResult = forecast.copy()
+        forecastResult.drop(index=0, inplace=True)
+        forecastResult.insert(0, "exchange", trainingDataForForecasting['exchange'][0])
+        forecastResult.insert(1, "index", trainingDataForForecasting['index'][0])
+        forecastResult.insert(2, "date", self.ctx['pScoreDate'])
 
         forecastDays = self.ctx['forecastDays']
-        pScoreDate = datetime.strptime(self.ctx['pScoreDate'], '%Y-%m-%d')
-        indexLevelsPScoreDate = self.trainingDataForForecasting['close'][pScoreDate]
-        for f in forecastDays:
-            forecast.at[f, 'indexReturns'] = forecast['forecastValues'][f]['value'] / indexLevelsPScoreDate - 1
+        indexLevelsPScoreDate = forecast['forecastValues'][0]['value']
+        for f in forecastDays[1:]:
+            forecastResult.at[f, 'indexReturns'] = forecast['forecastValues'][f]['value'] / indexLevelsPScoreDate - 1
 
-        return forecast
+        return forecastResult
 
