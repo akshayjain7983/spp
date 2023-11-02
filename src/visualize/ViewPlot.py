@@ -6,12 +6,12 @@ from sklearn.metrics import mean_squared_error
 from math import sqrt
 
 if __name__ == '__main__':
-    forecastPeriod = [30]
+    forecastPeriod = [90]
     mongoClient = MongoClient("mongodb://localhost:27017")
     forecastModel = "SppRandomForests"
     exchangeCode = "500086"
     dateStart = "2018-09-01"
-    dateEnd = "2019-06-13"
+    dateEnd = "2019-08-31"
 
     organizationMql = {"exchangeCode":exchangeCode}
     organization = mongoClient['spp']['organizations'].find_one(organizationMql)

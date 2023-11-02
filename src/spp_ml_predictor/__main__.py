@@ -39,6 +39,7 @@ def main(args):
     dataHistoryMonths = args[5]
     forecastor = args[6]
     exchangeCode = args[7] if len(args) >= 8 else None
+    # parallelDates = bool(args[8]) if len(args) >= 9 else False
 
     trainingDataDays = 31*int(dataHistoryMonths)
 
@@ -59,9 +60,30 @@ def main(args):
     pScoreStartDate = datetime.strptime(pScoreStartDate, '%Y-%m-%d')
     pScoreEndDate = datetime.strptime(pScoreEndDate, '%Y-%m-%d')
 
-    futures = []
+    # if(parallelDates):
+    #
+    #     futures = []
+    #     with ThreadPoolExecutor(max_workers=2) as executor:
+    #         for d in rrule(DAILY, dtstart=pScoreStartDate, until=pScoreEndDate):
+    #             pScoreDate = datetime.strftime(d, '%Y-%m-%d')
+    #             trainingEndDate = pScoreDate
+    #             trainingStartDate = datetime.strftime(datetime.strptime(trainingEndDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
+    #             trainingDataForTraining = extractTrainingData(trainingData, trainingStartDate, trainingEndDate)
+    #             ctx = {'exchange': exchange
+    #                 , 'pScoreDate': pScoreDate
+    #                 , 'trainingStartDate': trainingStartDate
+    #                 , 'trainingEndDate': trainingEndDate
+    #                 , 'index': index
+    #                 , 'exchangeCode': exchangeCode
+    #                 , 'forecastDays': forecastDays
+    #                 , 'forecastor': forecastor
+    #                 , 'trainingDataForTraining': trainingDataForTraining
+    #                 , 'cacheAndRetrainModel': False}
+    #             f = executor.submit(runSpp, ctx, sppMLTrainingDao)
+    #             futures.append(f)
+    #         executor.shutdown()
+    # else:
     modelCache = {}
-    # with ThreadPoolExecutor(max_workers=4) as executor:
     for d in rrule(DAILY, dtstart=pScoreStartDate, until=pScoreEndDate):
         pScoreDate = datetime.strftime(d, '%Y-%m-%d')
         trainingEndDate = pScoreDate
@@ -80,10 +102,6 @@ def main(args):
             , 'modelCache':modelCache}
         runSpp(ctx, sppMLTrainingDao)
         modelCache = ctx['modelCache']
-            # f = executor.submit(runSpp, ctx, sppMLTrainingDao)
-            # futures.append(f)
-
-    # executor.shutdown()
 
 if __name__ == '__main__':
     main(sys.argv[1:])

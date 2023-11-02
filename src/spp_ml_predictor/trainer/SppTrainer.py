@@ -77,21 +77,27 @@ class SppTrainer:
         inflationRatesPdf = self.setupInflationRates(inflationRatesPdf)
         forecastIndexReturns = self.__submitForSppIndexForecastTask__(indexLevelsPdf, interestRatesPdf, inflationRatesPdf)
 
+        multithread:bool = exchangeCodePdf['exchangeCode'].size > 1
 
-        futures = []
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            for ec in exchangeCodePdf['exchangeCode']:
-                future = executor.submit(self.__submitForSppSecurityForecastTask__, forecastIndexReturns
-                                         , securityPricesPdf[securityPricesPdf['exchangeCode'] == ec]
-                                         , interestRatesPdf, inflationRatesPdf)
-                futures.append(future)
+        if(multithread):
+            futures = []
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                for ec in exchangeCodePdf['exchangeCode']:
+                    future = executor.submit(self.__submitForSppSecurityForecastTask__, forecastIndexReturns
+                                             , securityPricesPdf[securityPricesPdf['exchangeCode'] == ec]
+                                             , interestRatesPdf, inflationRatesPdf)
+                    futures.append(future)
 
 
-        for f in futures:
-            try:
-                print(f.result())
-            except Exception:
-                print(f.exception())
+            for f in futures:
+                try:
+                    print(f.result())
+                except Exception:
+                    print(f.exception())
+
+        else:
+            forecast = self.__submitForSppSecurityForecastTask__(forecastIndexReturns, securityPricesPdf, interestRatesPdf, inflationRatesPdf)
+            print(forecast)
 
         endT = time.time()
         print("SppTrainer - "+self.ctx['pScoreDate']+" - Time taken:" + str(endT - startT) + " secs")
