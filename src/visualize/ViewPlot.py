@@ -6,10 +6,10 @@ from sklearn.metrics import mean_squared_error
 from math import sqrt
 
 if __name__ == '__main__':
-    forecastPeriod = [90]
+    forecastPeriod = [10]
     mongoClient = MongoClient("mongodb://localhost:27017")
-    forecastModel = "SppRandomForests"
-    exchangeCode = "500086"
+    forecastModel = "SppNN"
+    exchangeCode = "509488"
     dateStart = "2018-09-01"
     dateEnd = "2019-08-31"
 
@@ -79,5 +79,5 @@ if __name__ == '__main__':
 
     fileName = "SppForecasting_{}_{}_{}_{}_{}.jpg".format(exchangeCode, dateStart, dateEnd, forecastModel, str(forecastPeriod[0]))
     path = "/run/media/WORK/MTechDissertation/spp-ml-models/"
-    # plt.savefig(path+fileName, bbox_inches='tight')
+    plt.savefig(path+fileName, bbox_inches='tight')
     plt.show()

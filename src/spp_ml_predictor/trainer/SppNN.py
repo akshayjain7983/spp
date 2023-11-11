@@ -90,8 +90,6 @@ class SppNN(SppMLForecasterCachedModel):
 
     def __getNewRegressor__(self, train_features: pd.DataFrame, train_labels: pd.DataFrame):
         model = Sequential()
-        model.add(LSTM(128, return_sequences=True, input_shape=(train_features.shape[1], 1)))
-        model.add(LSTM(64, return_sequences=False))
         model.add(Dense(128, activation='relu'))
         model.add(Dense(64, activation='relu'))
         model.add(Dense(1))
