@@ -1,15 +1,19 @@
 from ..dao import SppMLTrainingDao
 import pandas as pd
+import pyspark.sql as ps
+import pyspark.sql.functions as psf
 from ..trainer.SppSecurityForecastTask import SppSecurityForecastTask
 from ..trainer.SppIndexForecastTask import SppIndexForecastTask
 from concurrent.futures import *
 from datetime import datetime, timedelta
+from dateutil.rrule import rrule, DAILY
 import time
 
 class SppTrainer:
-    def __init__(self, sppMLTrainingDao:SppMLTrainingDao, ctx:dict):
+    def __init__(self, sppMLTrainingDao:SppMLTrainingDao, ctx:dict, spark: ps.SparkSession):
         self.sppMLTrainingDao = sppMLTrainingDao
         self.ctx = ctx
+        self.spark = spark
 
     def __submitForSppSecurityForecastTask__(self
                                              , forecastIndexReturns:pd.DataFrame
@@ -34,7 +38,7 @@ class SppTrainer:
 
         sppTrainingTask = SppSecurityForecastTask(forecastIndexReturns, securityPricesPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
-        self.sppMLTrainingDao.saveForecastPScore(forecast, self.ctx)
+        # self.sppMLTrainingDao.saveForecastPScore(forecast, self.ctx)
         return forecast;
 
     def __submitForSppIndexForecastTask__(self
@@ -102,27 +106,25 @@ class SppTrainer:
         endT = time.time()
         print("SppTrainer - "+self.ctx['pScoreDate']+" - Time taken:" + str(endT - startT) + " secs")
 
-    def setupInterestRates(self, interestRatesPdf:pd.DataFrame) -> pd.DataFrame:
+    def setupInterestRates(self, interestRatesPdf:ps.DataFrame) -> pd.DataFrame:
 
         startDate = datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d')
         endDate = datetime.strptime(self.ctx['trainingEndDate'], '%Y-%m-%d')
         forecastDate = endDate + timedelta(days=self.ctx['forecastDays'][-1])
 
         # firt get interest rates for training period
-        interestRatesReindexPdf = pd.date_range(start=startDate, end=endDate, inclusive="both")
-        interestRatesPdf = interestRatesPdf[interestRatesPdf.index.isin(interestRatesReindexPdf)]
-        interestRatesPdf = interestRatesPdf.reindex(interestRatesReindexPdf, method='ffill')
-        interestRatesPdf.sort_index(inplace=True)
+        interestRatesPdf = interestRatesPdf[(interestRatesPdf.date >= startDate) & (interestRatesPdf.date <= endDate)]
+        interestRatesPdf = interestRatesPdf.sort('date')
 
         # assume interest rates remains constant for forecast period
-        interestRatesReindexPdf = pd.date_range(start=startDate, end=forecastDate, inclusive="both")
-        interestRatesPdf = interestRatesPdf.reindex(interestRatesReindexPdf, method='ffill')
-        interestRatesPdf.sort_index(inplace=True)
+        interestRatesLastDateOfTraining = interestRatesPdf.filter(interestRatesPdf['date'] == psf.max(interestRatesPdf['date'])).collect()[0][1]
+        extendedData = [(d, interestRatesLastDateOfTraining) for d in rrule(DAILY, dtstart=endDate, until=forecastDate)]
+        interestRatesExtendedDataPdf = self.spark.createDataFrame(extendedData, ['date', 'rate'])
+        interestRatesPdf = interestRatesPdf.union(interestRatesExtendedDataPdf)
 
         # finally make rates as fractions
-        interestRatesPdf['rateFraction'] = interestRatesPdf['rate'] / 100
-        interestRatesPdf.drop(['rate'], axis=1, inplace=True)
-        interestRatesPdf.rename(columns={"rateFraction": "rate"}, inplace=True)
+        interestRatesPdf = interestRatesPdf.withColumn('rate', interestRatesPdf['rate']/100)
+        interestRatesPdf.sort(psf.desc('date')).show()
 
         return interestRatesPdf
 

@@ -1,0 +1,116 @@
+<loadSecurityExchangeCodesCollectionName>
+organizations
+
+<loadSecurityExchangeCodesMql>
+[
+  {{
+    "$match":{{
+	    "exchange":"{}",
+	    "status":"Active" {}
+	}}
+  }}
+]
+
+
+<loadIndexLevelsCollectionName>
+indexLevels
+
+<loadIndexLevelsMql>
+[
+  {{
+    "$match":{{
+	    "exchange": "{}",
+	    "index": "{}",
+	    "date": {{
+	      "$gte": "{}",
+	      "$lte": "{}"
+	    }}
+	}}
+  }}
+]
+
+<loadSecurityPricesCollectionName>
+securityPrices
+
+<loadSecurityPricesMql>
+[
+  {{
+    "$match":{{
+	    "exchange": "{}",
+	    "tradingDate": {{
+	      "$gte": "{}",
+	      "$lte": "{}"
+	    }},
+	    "exchangeCode": {{"$in":[{}]}}
+	}}
+  }}
+]
+
+<loadSecurityTrainingPScoreCollectionName>
+trainingPScore
+
+<loadSecurityTrainingPScoreMql>
+[
+  {{
+    "$match":
+      {{
+        "exchange": "{}",
+        "index": "{}",
+        "date": {{
+          "$gte": "{}",
+          "$lte": "{}"
+        }},
+        "exchangeCode": {{"$in":[{}]}}
+      }}
+  }},
+  {{
+    "$group":
+      {{
+        "_id":"$exchangeCode",
+        "doc":{{"$addToSet":"$$ROOT"}}
+      }}
+  }}
+]
+
+<saveForecastPScoreCollectionName>
+forecastPScore
+
+<loadInterestRatesCollectionName>
+interestRates
+
+<loadInterestRatesMql>
+[
+  {{
+    "$match":{{
+	    "institution":"{}",
+	    "rateType":"{}"
+	}}
+  }},
+  {{
+  	"$project":{{
+  		"_id": 0,
+  		"date": 1, 
+  		"rate": 1
+  	}}
+  }}
+]
+
+<loadInflationRatesCollectionName>
+inflationRates
+
+<loadInflationtRatesMql>
+[
+  {{
+    "$match":{{
+	    "institution":"{}",
+	    "rateType":"{}"
+	}}
+  }},
+  {{
+  	"$project":{{
+  		"_id": 0,
+  		"date": 1, 
+  		"rate": 1
+  	}}
+  }}
+]

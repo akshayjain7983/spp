@@ -1,4 +1,4 @@
-import pandas as pd
+import pyspark.sql as ps
 from .dao import SppMLTrainingDao
 from .dao import QueryFiles
 from .trainer import SppTrainer
@@ -6,21 +6,19 @@ from .trainer import SppTrainingDataTransformer
 import sys
 from datetime import datetime, timedelta
 from dateutil.rrule import rrule, DAILY
-from concurrent.futures import *
 
-def runSpp(ctx:dict, sppMLTrainingDao: SppMLTrainingDao):
+def runSpp(ctx:dict, sppMLTrainingDao: SppMLTrainingDao, spark: ps.SparkSession):
 
-    sppTrainer:SppTrainer = SppTrainer.SppTrainer(sppMLTrainingDao, ctx)
+    sppTrainer:SppTrainer = SppTrainer.SppTrainer(sppMLTrainingDao, ctx, spark)
     sppTrainer.train()
 
 
 def extractTrainingData(trainingData:dict, trainingStartDate, trainingEndDate):
 
-    indexLevelsPdf:pd.DataFrame = trainingData['indexLevelsPdf']
+    indexLevelsPdf:ps.DataFrame = trainingData['indexLevelsPdf']
     indexLevelsPdfForTraining = indexLevelsPdf[(indexLevelsPdf.date >= trainingStartDate) & (indexLevelsPdf.date <= trainingEndDate)]
-    securityPricesPdf:pd.DataFrame = trainingData['securityPricesPdf']
+    securityPricesPdf:ps.DataFrame = trainingData['securityPricesPdf']
     securityPricesPdfForTraining = securityPricesPdf[(securityPricesPdf.tradingDate >= trainingStartDate) & (securityPricesPdf.tradingDate <= trainingEndDate)]
-
     trainingDataCopy = trainingData.copy()
     trainingDataCopy['indexLevelsPdf'] = indexLevelsPdfForTraining
     trainingDataCopy['securityPricesPdf'] = securityPricesPdfForTraining
@@ -39,11 +37,17 @@ def main(args):
     dataHistoryMonths = args[5]
     forecastor = args[6]
     exchangeCode = args[7] if len(args) >= 8 else None
-    # parallelDates = bool(args[8]) if len(args) >= 9 else False
 
     trainingDataDays = 31*int(dataHistoryMonths)
+    
+    spark = ps.SparkSession \
+                    .builder \
+                    .appName("spp") \
+                    .config("spark.mongodb.input.uri", "mongodb://localhost:27017") \
+                    .config("spark.mongodb.output.uri", "mongodb://localhost:27017") \
+                    .getOrCreate()
 
-    sppMLTrainingDao:SppMLTrainingDao = SppMLTrainingDao.SppMLTrainingDao()
+    sppMLTrainingDao:SppMLTrainingDao = SppMLTrainingDao.SppMLTrainingDao(spark)
     trainingStartDate = datetime.strftime(datetime.strptime(pScoreStartDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
     trainingDataCtx = {
         'trainingStartDate': trainingStartDate
@@ -60,29 +64,6 @@ def main(args):
     pScoreStartDate = datetime.strptime(pScoreStartDate, '%Y-%m-%d')
     pScoreEndDate = datetime.strptime(pScoreEndDate, '%Y-%m-%d')
 
-    # if(parallelDates):
-    #
-    #     futures = []
-    #     with ThreadPoolExecutor(max_workers=2) as executor:
-    #         for d in rrule(DAILY, dtstart=pScoreStartDate, until=pScoreEndDate):
-    #             pScoreDate = datetime.strftime(d, '%Y-%m-%d')
-    #             trainingEndDate = pScoreDate
-    #             trainingStartDate = datetime.strftime(datetime.strptime(trainingEndDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
-    #             trainingDataForTraining = extractTrainingData(trainingData, trainingStartDate, trainingEndDate)
-    #             ctx = {'exchange': exchange
-    #                 , 'pScoreDate': pScoreDate
-    #                 , 'trainingStartDate': trainingStartDate
-    #                 , 'trainingEndDate': trainingEndDate
-    #                 , 'index': index
-    #                 , 'exchangeCode': exchangeCode
-    #                 , 'forecastDays': forecastDays
-    #                 , 'forecastor': forecastor
-    #                 , 'trainingDataForTraining': trainingDataForTraining
-    #                 , 'cacheAndRetrainModel': False}
-    #             f = executor.submit(runSpp, ctx, sppMLTrainingDao)
-    #             futures.append(f)
-    #         executor.shutdown()
-    # else:
     modelCache = {}
     for d in rrule(DAILY, dtstart=pScoreStartDate, until=pScoreEndDate):
         pScoreDate = datetime.strftime(d, '%Y-%m-%d')
@@ -100,7 +81,7 @@ def main(args):
             , 'trainingDataForTraining': trainingDataForTraining
             , 'cacheAndRetrainModel': True
             , 'modelCache':modelCache}
-        runSpp(ctx, sppMLTrainingDao)
+        runSpp(ctx, sppMLTrainingDao, spark)
         modelCache = ctx['modelCache']
 
 if __name__ == '__main__':

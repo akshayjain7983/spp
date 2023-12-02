@@ -1,6 +1,6 @@
-import pandas as pd
+import pyspark.sql as ps
+import pyspark.sql.functions as psf
 from ..trainer import SppCandleStick
-import numpy as np
 
 class SppTrainingDataTransformer:
     def __init__(self, trainingData:dict, trainingDataCtx:dict):
@@ -8,40 +8,28 @@ class SppTrainingDataTransformer:
         self.trainingDataCtx = trainingDataCtx
 
     def __transformIndexData__(self):
-        indexLevelsPdf:pd.DataFrame = self.trainingData['indexLevelsPdf']
-        indexLevelsPdf['datetime'] = pd.to_datetime(indexLevelsPdf['date'])
-        indexLevelsPdf.set_index("datetime", inplace=True, drop=True)
-        indexLevelsPdf.sort_index(inplace=True)
+        indexLevelsPdf:ps.DataFrame = self.trainingData['indexLevelsPdf']
+        indexLevelsPdf = indexLevelsPdf.withColumn('date', psf.to_date(indexLevelsPdf['date'], 'yyyy-MM-dd')).sort('date')
         self.trainingData['indexLevelsPdf'] = indexLevelsPdf
 
     def __transformSecurityData__(self):
-        securityPricesPdf:pd.DataFrame = self.trainingData['securityPricesPdf']
-        securityPricesPdf['datetime'] = pd.to_datetime(securityPricesPdf['tradingDate'])
-        securityPricesPdf.set_index("datetime", inplace=True, drop=True)
-        securityPricesPdf.sort_index(inplace=True)
+        securityPricesPdf:ps.DataFrame = self.trainingData['securityPricesPdf']
+        securityPricesPdf = securityPricesPdf.withColumn('date', psf.to_date(securityPricesPdf['tradingDate'], 'yyyy-MM-dd')).sort('date')
         self.trainingData['securityPricesPdf'] = securityPricesPdf
 
-    def __initCandleStick__(self, row):
-        return SppCandleStick.SppCandleStick(row['open'], row['high'], row['low'], row['close'])
-
+    
     def __determineIndexCandlestickPatterns__(self):
-        indexLevelsPdf: pd.DataFrame = self.trainingData['indexLevelsPdf']
-        indexLevelsPdf['candlestick'] = indexLevelsPdf.apply(self.__initCandleStick__, axis=1)
-
-        for i in range(len(indexLevelsPdf)):
-            c0 = indexLevelsPdf.iloc[i]['candlestick']
-            candleStickRealBodyChange = c0.movement
-            indexLevelsPdf.loc[indexLevelsPdf.index[i], 'candleStickRealBodyChange'] = candleStickRealBodyChange
+        indexLevelsPdf: ps.DataFrame = self.trainingData['indexLevelsPdf']
+        udf = psf.udf(lambda row:SppCandleStick.SppCandleStick(row['open'], row['high'], row['low'], row['close']).movementReal)
+        indexLevelsPdf = indexLevelsPdf.withColumn('candlestickMovementReal', udf(psf.struct([indexLevelsPdf[x] for x in indexLevelsPdf.columns])))
+        self.trainingData['indexLevelsPdf'] = indexLevelsPdf
 
     def __determineSecurityCandlestickPatterns__(self):
-        securityPricesPdf: pd.DataFrame = self.trainingData['securityPricesPdf']
-        securityPricesPdf['candlestick'] = securityPricesPdf.apply(self.__initCandleStick__, axis=1)
-
-        for i in range(len(securityPricesPdf)):
-            c0 = securityPricesPdf.iloc[i]['candlestick']
-            candleStickRealBodyChange = c0.movement
-            securityPricesPdf.loc[securityPricesPdf.index[i], 'candleStickRealBodyChange'] = candleStickRealBodyChange
-
+        securityPricesPdf: ps.DataFrame = self.trainingData['securityPricesPdf']
+        udf = psf.udf(lambda row:SppCandleStick.SppCandleStick(row['open'], row['high'], row['low'], row['close']).movementReal)
+        securityPricesPdf = securityPricesPdf.withColumn('candlestickMovementReal', udf(psf.struct([securityPricesPdf[x] for x in securityPricesPdf.columns])))
+        self.trainingData['securityPricesPdf'] = securityPricesPdf
+        
 
     def transform(self):
         self.__transformIndexData__()
