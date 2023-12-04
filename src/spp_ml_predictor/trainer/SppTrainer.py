@@ -61,6 +61,8 @@ class SppTrainer:
         xtraDataPdf: ps.DataFrame = interestRatesPdf.select('date', 'rate').withColumnRenamed('rate', 'repo')
         xtraDataPdf = xtraDataPdf.join(inflationRatesPdf.select('date', 'rate').withColumnRenamed('rate', 'inflation'), 'date')
         xtraDataPdf = xtraDataPdf.join(indexLevelsPdfLocal.select('date', 'candlestickMovementReal'), 'date', 'leftouter')
+        
+        xtraDataPdf.orderBy(psf.desc('date')).show(90)
 
         sppTrainingTask = SppIndexForecastTask(indexLevelsPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()

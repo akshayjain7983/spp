@@ -11,24 +11,21 @@ def __fill__(pdf:ps.DataFrame
                     , fillDirection:str='ffill') -> ps.DataFrame :
     
     pdfr:ps.DataFrame = pdf
-
-    if(colname):
-        colFilled = psf.last(pdf[colname], True).over(window) if fillDirection=='ffill' else psf.first(pdf[colname], True).over(window)
-        if(fillRangeColname and fillRangeColStart and fillRangeColEnd):
-            pdfr = pdf.withColumn(colname, psf.when((pdf[fillRangeColname] >= fillRangeColStart) & (pdf[fillRangeColname] <= fillRangeColEnd), colFilled))
-        else:
-            pdfr = pdf.withColumn(colname, colFilled)
-    else:
-        colsFilled = []
-        for col in pdf.dtypes:
+    
+    colsFilled = []
+    for col in pdf.dtypes:
+        colFilled = None
+        if(colname and col[0] != colname): #carry forward only colname
+            colFilled = psf.col(col[0])
+        else: #carry forward all or only colname
             colFilled = psf.last(col[0], True).over(window) if fillDirection=='ffill' else psf.first(col[0], True).over(window)
-            if(fillRangeColname and fillRangeColStart and fillRangeColEnd):
-                colsFilled.append(psf.when((pdf[fillRangeColname] >= fillRangeColStart) & (pdf[fillRangeColname] <= fillRangeColEnd), colFilled).alias(col[0]))
-            else:
-                colsFilled.append(colFilled.alias(col[0]))
-            
-            
-        pdfr = pdfr.select(colsFilled)
+        
+        if(fillRangeColname and fillRangeColStart and fillRangeColEnd):
+            colsFilled.append(psf.when((pdf[fillRangeColname] >= fillRangeColStart) & (pdf[fillRangeColname] <= fillRangeColEnd), colFilled).alias(col[0]))
+        else:
+            colsFilled.append(colFilled.alias(col[0]))
+    
+    pdfr = pdfr.select(colsFilled)
             
     return pdfr
 
