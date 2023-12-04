@@ -7,9 +7,9 @@ import sys
 from datetime import datetime, timedelta
 from dateutil.rrule import rrule, DAILY
 
-def runSpp(ctx:dict, sppMLTrainingDao: SppMLTrainingDao, spark: ps.SparkSession):
+def runSpp(ctx:dict, sppMLTrainingDao: SppMLTrainingDao):
 
-    sppTrainer:SppTrainer = SppTrainer.SppTrainer(sppMLTrainingDao, ctx, spark)
+    sppTrainer:SppTrainer = SppTrainer.SppTrainer(sppMLTrainingDao, ctx)
     sppTrainer.train()
 
 
@@ -80,8 +80,9 @@ def main(args):
             , 'forecastor': forecastor
             , 'trainingDataForTraining': trainingDataForTraining
             , 'cacheAndRetrainModel': True
-            , 'modelCache':modelCache}
-        runSpp(ctx, sppMLTrainingDao, spark)
+            , 'modelCache':modelCache
+            , 'spark': spark}
+        runSpp(ctx, sppMLTrainingDao)
         modelCache = ctx['modelCache']
 
 if __name__ == '__main__':

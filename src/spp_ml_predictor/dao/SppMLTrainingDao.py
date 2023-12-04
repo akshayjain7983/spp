@@ -4,6 +4,7 @@ import pandas as pd
 from ..dao import QueryFiles
 from ..dao import QueryHolder
 import json
+import sys
 
 class SppMLTrainingDao:
 
@@ -91,7 +92,7 @@ class SppMLTrainingDao:
                                     
                           
         interestRates = interestRates.withColumn('date', psf.to_date(interestRates['date'], 'dd-MM-yyyy')).sort('date')
-        return interestRates
+        return interestRates.select('rateType', 'date', 'rate')
 
     def loadInflationRates(self, institution, rateType) -> ps.DataFrame:
 
@@ -105,8 +106,8 @@ class SppMLTrainingDao:
                                                         .option("aggregation.pipeline", inflationRatesMql_dict) \
                                                         .load()
                                                         
-        inflationRates = inflationRates.withColumn('date', psf.to_date(inflationRates['date'], 'dd-MM-yyyy')).sort('date')
-        return inflationRates
+        inflationRates = inflationRates.withColumn('date', psf.to_date(inflationRates['date'], 'yyyy-MM-dd')).sort('date')
+        return inflationRates.select('rateType', 'date', 'rate')
 
 
     def saveForecastPScore(self, forecastPScore:pd.DataFrame, ctx:dict):

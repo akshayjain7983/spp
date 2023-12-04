@@ -89,6 +89,7 @@ interestRates
   {{
   	"$project":{{
   		"_id": 0,
+  		"rateType": 1,
   		"date": 1, 
   		"rate": 1
   	}}
@@ -109,6 +110,7 @@ inflationRates
   {{
   	"$project":{{
   		"_id": 0,
+  		"rateType": 1,
   		"date": 1, 
   		"rate": 1
   	}}

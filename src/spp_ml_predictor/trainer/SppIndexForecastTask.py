@@ -1,10 +1,10 @@
+import pyspark.sql as ps
 import pandas as pd
-from datetime import datetime
 from ..trainer.SppForecastTask import SppForecastTask
 
 
 class SppIndexForecastTask(SppForecastTask):
-    def __init__(self, indexLevelsData:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
+    def __init__(self, indexLevelsData:ps.DataFrame, ctx:dict, xtraDataPdf:ps.DataFrame):
         super().__init__(indexLevelsData, ctx, xtraDataPdf)
         self.name = "SppIndexForecastTask"
 

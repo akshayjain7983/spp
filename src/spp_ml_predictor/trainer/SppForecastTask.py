@@ -1,3 +1,5 @@
+import pyspark.sql as ps
+import pyspark.sql.functions as psf
 import pandas as pd
 import time
 from ..trainer.SppForecaster import SppForecaster
@@ -5,12 +7,12 @@ from ..trainer.SppRandomForests import SppRandomForests
 # from ..trainer.SppNN import SppNN
 
 class SppForecastTask:
-    def __init__(self, trainingDataForForecasting:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
+    def __init__(self, trainingDataForForecasting:ps.DataFrame, ctx:dict, xtraDataPdf:ps.DataFrame):
         self.trainingDataForForecasting = trainingDataForForecasting
         self.ctx = ctx
         self.xtraDataPdf = xtraDataPdf
 
-    def __invokeForecastor__(self, trainingData:pd.DataFrame) ->pd.DataFrame:
+    def __invokeForecastor__(self, trainingData:ps.DataFrame) ->pd.DataFrame:
         forecastor = self.ctx['forecastor']
         sppForecaster:SppForecaster = None
         match forecastor:
@@ -22,19 +24,26 @@ class SppForecastTask:
 
         return sppForecaster.forecast()
 
-    def __preForecast__(self) -> pd.DataFrame:
+    def __preForecast__(self) -> ps.DataFrame:
         return self.trainingDataForForecasting
 
-    def __postForecast__(self, trainingDataForForecasting:pd.DataFrame, forecast:pd.DataFrame) -> pd.DataFrame:
+    def __postForecast__(self, trainingDataForForecasting:ps.DataFrame, forecast:ps.DataFrame) -> pd.DataFrame:
         return forecast
 
-    def forecast(self) -> pd.DataFrame:
+    def forecast(self) -> ps.DataFrame:
         trainingData = self.__preForecast__()
         forecast = self.__invokeForecastor__(trainingData)
         finalForecastResult = self.__postForecast__(trainingData, forecast)
         return finalForecastResult
 
     def __setupCandlestickPatternLags__(self):
+
+        lagWindow = ps.Window.orderBy('date')
+        candleStickLags = 9
+        for i in range(1, candleStickLags):
+            self.xtraDataPdf = self.xtraDataPdf.withColumn(f'candlestickMovementRealLag{i}', psf.lag('candlestickMovementReal', i).over(lagWindow))
+        
+
 
         candleStickLags = 5
         for i in range(1, candleStickLags):

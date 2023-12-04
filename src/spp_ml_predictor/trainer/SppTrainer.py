@@ -1,40 +1,44 @@
-from ..dao import SppMLTrainingDao
+from concurrent.futures.thread import ThreadPoolExecutor
+from datetime import datetime, timedelta
+import sys
+import time
+
+from dateutil.rrule import rrule, DAILY
+
 import pandas as pd
 import pyspark.sql as ps
 import pyspark.sql.functions as psf
-from ..trainer.SppSecurityForecastTask import SppSecurityForecastTask
+
+from ..dao import SppMLTrainingDao
 from ..trainer.SppIndexForecastTask import SppIndexForecastTask
-from concurrent.futures import *
-from datetime import datetime, timedelta
-from dateutil.rrule import rrule, DAILY
-import time
+from ..trainer.SppSecurityForecastTask import SppSecurityForecastTask
+from ..util.SppUtil import ffill
+from ..util.SppUtil import fillGapsOrdered
+
 
 class SppTrainer:
-    def __init__(self, sppMLTrainingDao:SppMLTrainingDao, ctx:dict, spark: ps.SparkSession):
+    def __init__(self, sppMLTrainingDao:SppMLTrainingDao, ctx:dict):
         self.sppMLTrainingDao = sppMLTrainingDao
         self.ctx = ctx
-        self.spark = spark
 
     def __submitForSppSecurityForecastTask__(self
-                                             , forecastIndexReturns:pd.DataFrame
-                                             , securityPricesPdf:pd.DataFrame
-                                             , interestRatesPdf:pd.DataFrame
-                                             , inflationRatesPdf:pd.DataFrame) -> pd.DataFrame:
+                                             , forecastIndexReturns:ps.DataFrame
+                                             , securityPricesPdf:ps.DataFrame
+                                             , interestRatesPdf:ps.DataFrame
+                                             , inflationRatesPdf:ps.DataFrame) -> ps.DataFrame:
 
-        securityPricesPdfLocal = securityPricesPdf.copy()
-        securityPricesPdfLocal['datetime'] = pd.to_datetime(securityPricesPdfLocal['tradingDate'])
-        securityPricesPdfLocal.set_index("datetime", inplace=True, drop=True)
-        securityPricesPdfLocal.sort_index(inplace=True)
-        securityPricesReindexPdf = pd.date_range(start=datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d'),
-                                                  end=datetime.strptime(self.ctx['pScoreDate'], '%Y-%m-%d'),
-                                                  inclusive="both")
-        securityPricesPdfLocal = securityPricesPdfLocal.reindex(securityPricesReindexPdf, method='ffill')
-        securityPricesPdfLocal.dropna(inplace=True) #sometimes ffill with reindex may result in nan at begining so drop those
 
-        xtraDataPdf:pd.DataFrame = interestRatesPdf.drop(['_id', 'date', 'institution', 'rateType'], axis=1)
-        xtraDataPdf.rename(columns={"rate": "repo"}, inplace=True)
-        xtraDataPdf['inflation'] = inflationRatesPdf['rate']
-        xtraDataPdf['candleStickRealBodyChange'] = securityPricesPdfLocal['candleStickRealBodyChange']
+        startDate = datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d')
+        pScoreDate = datetime.strptime(self.ctx['pScoreDate'], '%Y-%m-%d')
+        securityPricesPdfLocal = securityPricesPdf[(securityPricesPdf.date >= startDate) & (securityPricesPdf.date <= pScoreDate)]
+        spark: ps.SparkSession = self.ctx['spark']
+        extendedData = [d for d in rrule(DAILY, dtstart=startDate, until=pScoreDate)]
+        securityPricesPdfLocal = fillGapsOrdered(securityPricesPdfLocal, spark, 'date', extendedData)
+        securityPricesPdfLocal = securityPricesPdfLocal.dropna().sort('date')
+        
+        xtraDataPdf: ps.DataFrame = interestRatesPdf.select('date', 'rate').withColumnRenamed('rate', 'repo')
+        xtraDataPdf = xtraDataPdf.join(inflationRatesPdf.select('date', 'rate').withColumnRenamed('rate', 'inflation'), 'date')
+        xtraDataPdf = xtraDataPdf.join(securityPricesPdfLocal.select('date', 'candlestickMovementReal'), 'date', 'leftouter')
 
         sppTrainingTask = SppSecurityForecastTask(forecastIndexReturns, securityPricesPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
@@ -42,24 +46,21 @@ class SppTrainer:
         return forecast;
 
     def __submitForSppIndexForecastTask__(self
-                                          , indexLevelsPdf:pd.DataFrame
-                                          , interestRatesPdf:pd.DataFrame
-                                          , inflationRatesPdf:pd.DataFrame) -> pd.DataFrame:
-
-        indexLevelsPdfLocal = indexLevelsPdf.copy()
-        indexLevelsPdfLocal['datetime'] = pd.to_datetime(indexLevelsPdfLocal['date'])
-        indexLevelsPdfLocal.set_index("datetime", inplace=True, drop=True)
-        indexLevelsPdfLocal.sort_index(inplace=True)
-        indexLevelsReindexPdf = pd.date_range(start=datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d'),
-                                               end=datetime.strptime(self.ctx['pScoreDate'], '%Y-%m-%d'),
-                                               inclusive="both")
-        indexLevelsPdfLocal = indexLevelsPdfLocal.reindex(indexLevelsReindexPdf, method='ffill')
-        indexLevelsPdfLocal.dropna(inplace=True) #sometimes ffill with reindex may result in nan at begining so drop those
-
-        xtraDataPdf = interestRatesPdf.drop(['_id', 'date', 'institution', 'rateType'], axis=1)
-        xtraDataPdf.rename(columns={"rate": "repo"}, inplace=True)
-        xtraDataPdf['inflation'] = inflationRatesPdf['rate']
-        xtraDataPdf['candleStickRealBodyChange'] = indexLevelsPdfLocal['candleStickRealBodyChange']
+                                          , indexLevelsPdf:ps.DataFrame
+                                          , interestRatesPdf:ps.DataFrame
+                                          , inflationRatesPdf:ps.DataFrame) -> ps.DataFrame:
+        
+        startDate = datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d')
+        pScoreDate = datetime.strptime(self.ctx['pScoreDate'], '%Y-%m-%d')
+        indexLevelsPdfLocal = indexLevelsPdf[(indexLevelsPdf.date >= startDate) & (indexLevelsPdf.date <= pScoreDate)]
+        spark: ps.SparkSession = self.ctx['spark']
+        extendedData = [d for d in rrule(DAILY, dtstart=startDate, until=pScoreDate)]
+        indexLevelsPdfLocal = fillGapsOrdered(indexLevelsPdfLocal, spark, 'date', extendedData)
+        indexLevelsPdfLocal = indexLevelsPdfLocal.dropna().sort('date')
+        
+        xtraDataPdf: ps.DataFrame = interestRatesPdf.select('date', 'rate').withColumnRenamed('rate', 'repo')
+        xtraDataPdf = xtraDataPdf.join(inflationRatesPdf.select('date', 'rate').withColumnRenamed('rate', 'inflation'), 'date')
+        xtraDataPdf = xtraDataPdf.join(indexLevelsPdfLocal.select('date', 'candlestickMovementReal'), 'date', 'leftouter')
 
         sppTrainingTask = SppIndexForecastTask(indexLevelsPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
@@ -106,7 +107,7 @@ class SppTrainer:
         endT = time.time()
         print("SppTrainer - "+self.ctx['pScoreDate']+" - Time taken:" + str(endT - startT) + " secs")
 
-    def setupInterestRates(self, interestRatesPdf:ps.DataFrame) -> pd.DataFrame:
+    def setupInterestRates(self, interestRatesPdf:ps.DataFrame) -> ps.DataFrame:
 
         startDate = datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d')
         endDate = datetime.strptime(self.ctx['trainingEndDate'], '%Y-%m-%d')
@@ -117,37 +118,32 @@ class SppTrainer:
         interestRatesPdf = interestRatesPdf.sort('date')
 
         # assume interest rates remains constant for forecast period
-        interestRatesLastDateOfTraining = interestRatesPdf.filter(interestRatesPdf['date'] == psf.max(interestRatesPdf['date'])).collect()[0][1]
-        extendedData = [(d, interestRatesLastDateOfTraining) for d in rrule(DAILY, dtstart=endDate, until=forecastDate)]
-        interestRatesExtendedDataPdf = self.spark.createDataFrame(extendedData, ['date', 'rate'])
-        interestRatesPdf = interestRatesPdf.union(interestRatesExtendedDataPdf)
-
+        spark: ps.SparkSession = self.ctx['spark']
+        extendedData = [d for d in rrule(DAILY, dtstart=startDate, until=forecastDate)]
+        interestRatesPdf = fillGapsOrdered(interestRatesPdf, spark, 'date', extendedData)
+        
         # finally make rates as fractions
         interestRatesPdf = interestRatesPdf.withColumn('rate', interestRatesPdf['rate']/100)
-        interestRatesPdf.sort(psf.desc('date')).show()
 
         return interestRatesPdf
 
-    def setupInflationRates(self, inflationRatesPdf:pd.DataFrame) -> pd.DataFrame:
+    def setupInflationRates(self, inflationRatesPdf:ps.DataFrame) -> ps.DataFrame:
 
         startDate = datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d')
         endDate = datetime.strptime(self.ctx['trainingEndDate'], '%Y-%m-%d')
         forecastDate = endDate + timedelta(days=self.ctx['forecastDays'][-1])
 
         # firt get inflation rates for training period
-        inflationRatesReindexPdf = pd.date_range(start=startDate, end=endDate, inclusive="both")
-        inflationRatesPdf = inflationRatesPdf[inflationRatesPdf.index.isin(inflationRatesReindexPdf)]
-        inflationRatesPdf = inflationRatesPdf.reindex(inflationRatesReindexPdf, method='bfill')
-        inflationRatesPdf.sort_index(inplace=True)
+        inflationRatesPdf = inflationRatesPdf[(inflationRatesPdf.date >= startDate) & (inflationRatesPdf.date <= endDate)]
+        inflationRatesPdf = inflationRatesPdf.sort('date')
 
         # assume inflation rates remains constant for forecast period
-        inflationRatesReindexPdf = pd.date_range(start=startDate, end=forecastDate, inclusive="both")
-        inflationRatesPdf = inflationRatesPdf.reindex(inflationRatesReindexPdf, method='ffill')
-        inflationRatesPdf.sort_index(inplace=True)
-
-        #finally make rates as fractions
-        inflationRatesPdf['rateFraction'] = inflationRatesPdf['rate']/100
-        inflationRatesPdf.drop(['rate'], axis=1, inplace=True)
-        inflationRatesPdf.rename(columns={"rateFraction": "rate"}, inplace=True)
+        spark: ps.SparkSession = self.ctx['spark']
+        extendedData = [d for d in rrule(DAILY, dtstart=startDate, until=forecastDate)]
+        inflationRatesPdf = fillGapsOrdered(inflationRatesPdf, spark, 'date', extendedData)
+        
+        # finally make rates as fractions
+        inflationRatesPdf = inflationRatesPdf.withColumn('rate', inflationRatesPdf['rate']/100)
 
         return inflationRatesPdf
+    
