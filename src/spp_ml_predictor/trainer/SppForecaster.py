@@ -1,8 +1,7 @@
-
-import pandas as pd
+import pyspark.sql as ps
 
 class SppForecaster:
-    def __init__(self, trainingDataPdf:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
+    def __init__(self, trainingDataPdf:ps.DataFrame, ctx:dict, xtraDataPdf:ps.DataFrame):
         self.trainingDataPdf = trainingDataPdf
         self.ctx = ctx
         self.xtraDataPdf = xtraDataPdf
@@ -10,5 +9,5 @@ class SppForecaster:
     def __getName__(self):
         return None
 
-    def forecast(self) -> pd.DataFrame:
+    def forecast(self) -> ps.DataFrame:
         pass

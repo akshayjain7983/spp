@@ -1,19 +1,17 @@
 from concurrent.futures.thread import ThreadPoolExecutor
 from datetime import datetime, timedelta
-import sys
 import time
 
 from dateutil.rrule import rrule, DAILY
 
-import pandas as pd
 import pyspark.sql as ps
 import pyspark.sql.functions as psf
 
 from ..dao import SppMLTrainingDao
 from ..trainer.SppIndexForecastTask import SppIndexForecastTask
 from ..trainer.SppSecurityForecastTask import SppSecurityForecastTask
-from ..util.SppUtil import ffill
 from ..util.SppUtil import fillGapsOrdered
+from pyspark.sql.types import DoubleType
 
 
 class SppTrainer:
@@ -58,12 +56,9 @@ class SppTrainer:
         indexLevelsPdfLocal = fillGapsOrdered(indexLevelsPdfLocal, spark, 'date', extendedData)
         indexLevelsPdfLocal = indexLevelsPdfLocal.dropna().sort('date')
         
-        xtraDataPdf: ps.DataFrame = interestRatesPdf.select('date', 'rate').withColumnRenamed('rate', 'repo')
-        xtraDataPdf = xtraDataPdf.join(inflationRatesPdf.select('date', 'rate').withColumnRenamed('rate', 'inflation'), 'date')
+        xtraDataPdf: ps.DataFrame = interestRatesPdf.select(psf.col('date'), psf.col('rate').name('repo').cast(DoubleType()))
+        xtraDataPdf = xtraDataPdf.join(inflationRatesPdf.select(psf.col('date'), psf.col('rate').name('inflation').cast(DoubleType())), 'date')
         xtraDataPdf = xtraDataPdf.join(indexLevelsPdfLocal.select('date', 'candlestickMovementReal'), 'date', 'leftouter')
-        
-        xtraDataPdf.orderBy(psf.desc('date')).show(90)
-
         sppTrainingTask = SppIndexForecastTask(indexLevelsPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
         return forecast;

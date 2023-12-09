@@ -21,7 +21,7 @@ def __fill__(pdf:ps.DataFrame
             colFilled = psf.last(col[0], True).over(window) if fillDirection=='ffill' else psf.first(col[0], True).over(window)
         
         if(fillRangeColname and fillRangeColStart and fillRangeColEnd):
-            colsFilled.append(psf.when((pdf[fillRangeColname] >= fillRangeColStart) & (pdf[fillRangeColname] <= fillRangeColEnd), colFilled).alias(col[0]))
+            colsFilled.append(psf.when((pdf[fillRangeColname] >= fillRangeColStart) & (pdf[fillRangeColname] <= fillRangeColEnd), colFilled).otherwise(psf.col(col[0])).alias(col[0]))
         else:
             colsFilled.append(colFilled.alias(col[0]))
     
@@ -37,17 +37,18 @@ def ffill(pdf:ps.DataFrame
             , fillRangeColStart=None
             , fillRangeColEnd=None) -> ps.DataFrame :
     
-    window = None
-    if(partitionColName and orderingColName):
-        window = ps.Window.partitionBy(partitionColName).orderBy(orderingColName).rowsBetween(-sys.maxsize, 0)
-    elif(partitionColName and not orderingColName):
-        window = ps.Window.partitionBy(partitionColName).rowsBetween(-sys.maxsize, 0)
-    elif(not partitionColName and orderingColName):
-        window = ps.Window.orderBy(orderingColName).rowsBetween(-sys.maxsize, 0)
-    else:
-        window = ps.Window.rowsBetween(-sys.maxsize, 0)
+    pdfLocal = pdf
+    if(not partitionColName):
+        partitionColName = 'tempPartitioning'
+        pdfLocal = pdfLocal.withColumn(partitionColName, psf.lit(partitionColName))
     
-    return __fill__(pdf, window, colname, fillRangeColname, fillRangeColStart, fillRangeColEnd, 'ffill')
+    if(not orderingColName):
+        orderingColName = colname
+    
+    window = ps.Window.partitionBy(partitionColName).orderBy(orderingColName).rowsBetween(-sys.maxsize, 0)
+    retval = __fill__(pdfLocal, window, colname, fillRangeColname, fillRangeColStart, fillRangeColEnd, 'ffill')
+    
+    return retval if(partitionColName != 'tempPartitioning') else retval.drop(partitionColName)
     
 def bfill(pdf:ps.DataFrame
             , colname:str=None
@@ -57,17 +58,18 @@ def bfill(pdf:ps.DataFrame
             , fillRangeColStart=None
             , fillRangeColEnd=None) -> ps.DataFrame :
     
-    window = None
-    if(partitionColName and orderingColName):
-        window = ps.Window.partitionBy(partitionColName).orderBy(orderingColName).rowsBetween(0, sys.maxsize)
-    elif(partitionColName and not orderingColName):
-        window = ps.Window.partitionBy(partitionColName).rowsBetween(0, sys.maxsize)
-    elif(not partitionColName and orderingColName):
-        window = ps.Window.orderBy(orderingColName).rowsBetween(0, sys.maxsize)
-    else:
-        window = ps.Window.rowsBetween(-sys.maxsize, 0)
+    pdfLocal = pdf
+    if(not partitionColName):
+        partitionColName = 'tempPartitioning'
+        pdfLocal = pdfLocal.withColumn(partitionColName, psf.lit(partitionColName))
     
-    return __fill__(pdf, window, colname, fillRangeColname, fillRangeColStart, fillRangeColEnd, 'bfill')
+    if(not orderingColName):
+        orderingColName = colname
+    
+    window = ps.Window.partitionBy(partitionColName).orderBy(orderingColName).rowsBetween(0, sys.maxsize)
+    retval = __fill__(pdfLocal, window, colname, fillRangeColname, fillRangeColStart, fillRangeColEnd, 'bfill')
+    
+    return retval if(partitionColName != 'tempPartitioning') else retval.drop(partitionColName)
     
 def fillGapsOrdered(pdf:ps.DataFrame
                                 , spark:ps.SparkSession

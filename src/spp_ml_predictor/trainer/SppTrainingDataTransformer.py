@@ -1,6 +1,7 @@
 import pyspark.sql as ps
 import pyspark.sql.functions as psf
 from ..trainer import SppCandleStick
+from pyspark.sql.types import DoubleType
 
 class SppTrainingDataTransformer:
     def __init__(self, trainingData:dict, trainingDataCtx:dict):
@@ -20,13 +21,13 @@ class SppTrainingDataTransformer:
     
     def __determineIndexCandlestickPatterns__(self):
         indexLevelsPdf: ps.DataFrame = self.trainingData['indexLevelsPdf']
-        udf = psf.udf(lambda row:SppCandleStick.SppCandleStick(row['open'], row['high'], row['low'], row['close']).movementReal)
+        udf = psf.udf(lambda row:SppCandleStick.SppCandleStick(row['open'], row['high'], row['low'], row['close']).movementReal, DoubleType())
         indexLevelsPdf = indexLevelsPdf.withColumn('candlestickMovementReal', udf(psf.struct([indexLevelsPdf[x] for x in indexLevelsPdf.columns])))
         self.trainingData['indexLevelsPdf'] = indexLevelsPdf
 
     def __determineSecurityCandlestickPatterns__(self):
         securityPricesPdf: ps.DataFrame = self.trainingData['securityPricesPdf']
-        udf = psf.udf(lambda row:SppCandleStick.SppCandleStick(row['open'], row['high'], row['low'], row['close']).movementReal)
+        udf = psf.udf(lambda row:SppCandleStick.SppCandleStick(row['open'], row['high'], row['low'], row['close']).movementReal, DoubleType())
         securityPricesPdf = securityPricesPdf.withColumn('candlestickMovementReal', udf(psf.struct([securityPricesPdf[x] for x in securityPricesPdf.columns])))
         self.trainingData['securityPricesPdf'] = securityPricesPdf
         
