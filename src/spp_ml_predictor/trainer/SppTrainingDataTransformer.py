@@ -16,7 +16,7 @@ class SppTrainingDataTransformer:
 
     def __transformSecurityData__(self):
         securityPricesPdf:pd.DataFrame = self.trainingData['securityPricesPdf']
-        securityPricesPdf['datetime'] = pd.to_datetime(securityPricesPdf['tradingDate'])
+        securityPricesPdf['datetime'] = pd.to_datetime(securityPricesPdf['date'])
         securityPricesPdf.set_index("datetime", inplace=True, drop=True)
         securityPricesPdf.sort_index(inplace=True)
         self.trainingData['securityPricesPdf'] = securityPricesPdf

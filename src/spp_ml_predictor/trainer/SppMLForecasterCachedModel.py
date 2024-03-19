@@ -26,7 +26,7 @@ class SppMLForecasterCachedModel(SppMLForecaster):
                 model = modelCacheForIndex.get('modelInUse')
                 modelLastTrainingDate = modelCacheForIndex.get('modelInUseLastTrainingDate')
             else:
-                modelCacheKey = self.trainingDataPdf.iloc[0]['exchangeCode']
+                modelCacheKey = self.trainingDataPdf.iloc[0]['exchange_code']
                 modelCacheForSecurity = modelCache.get(modelCacheKey)
                 if (modelCacheForSecurity == None):
                     modelCacheForSecurity = {}

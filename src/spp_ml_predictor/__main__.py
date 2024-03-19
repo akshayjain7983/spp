@@ -1,12 +1,13 @@
 import pandas as pd
 from .dao import SppMLTrainingDao
+from .dao import SppMLDao
 from .dao import QueryFiles
 from .trainer import SppTrainer
 from .trainer import SppTrainingDataTransformer
 import sys
 from datetime import datetime, timedelta
 from dateutil.rrule import rrule, DAILY
-from concurrent.futures import *
+from .config.ConfigReader import readConfig
 
 def runSpp(ctx:dict, sppMLTrainingDao: SppMLTrainingDao):
 
@@ -19,7 +20,7 @@ def extractTrainingData(trainingData:dict, trainingStartDate, trainingEndDate):
     indexLevelsPdf:pd.DataFrame = trainingData['indexLevelsPdf']
     indexLevelsPdfForTraining = indexLevelsPdf[(indexLevelsPdf.date >= trainingStartDate) & (indexLevelsPdf.date <= trainingEndDate)]
     securityPricesPdf:pd.DataFrame = trainingData['securityPricesPdf']
-    securityPricesPdfForTraining = securityPricesPdf[(securityPricesPdf.tradingDate >= trainingStartDate) & (securityPricesPdf.tradingDate <= trainingEndDate)]
+    securityPricesPdfForTraining = securityPricesPdf[(securityPricesPdf.date >= trainingStartDate) & (securityPricesPdf.date <= trainingEndDate)]
 
     trainingDataCopy = trainingData.copy()
     trainingDataCopy['indexLevelsPdf'] = indexLevelsPdfForTraining
@@ -27,10 +28,11 @@ def extractTrainingData(trainingData:dict, trainingStartDate, trainingEndDate):
     return trainingDataCopy
 
 def main(args):
+    config = readConfig(configFilename = 'spp_ml_predictor/config.ini')
     QueryFiles.load()
 
-    pScoreStartDate = args[0]
-    pScoreEndDate = args[1]
+    pScoreStartDate = datetime.strptime(args[0], '%Y-%m-%d').date()
+    pScoreEndDate = datetime.strptime(args[1], '%Y-%m-%d').date()
     forecastDays = [int(e) for e in args[2].split(',')]
     forecastDays.append(0)
     forecastDays.sort()
@@ -39,12 +41,11 @@ def main(args):
     dataHistoryMonths = args[5]
     forecastor = args[6]
     exchangeCode = args[7] if len(args) >= 8 else None
-    # parallelDates = bool(args[8]) if len(args) >= 9 else False
 
     trainingDataDays = 31*int(dataHistoryMonths)
 
-    sppMLTrainingDao:SppMLTrainingDao = SppMLTrainingDao.SppMLTrainingDao()
-    trainingStartDate = datetime.strftime(datetime.strptime(pScoreStartDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
+    sppMLTrainingDao:SppMLDao = SppMLDao.SppMLDao(config)
+    trainingStartDate = pScoreStartDate - timedelta(days=trainingDataDays)
     trainingDataCtx = {
         'trainingStartDate': trainingStartDate
         , 'trainingEndDate': pScoreEndDate
@@ -57,37 +58,11 @@ def main(args):
     transformer:SppTrainingDataTransformer = SppTrainingDataTransformer.SppTrainingDataTransformer(trainingData, trainingDataCtx)
     trainingData = transformer.transform()
 
-    pScoreStartDate = datetime.strptime(pScoreStartDate, '%Y-%m-%d')
-    pScoreEndDate = datetime.strptime(pScoreEndDate, '%Y-%m-%d')
-
-    # if(parallelDates):
-    #
-    #     futures = []
-    #     with ThreadPoolExecutor(max_workers=2) as executor:
-    #         for d in rrule(DAILY, dtstart=pScoreStartDate, until=pScoreEndDate):
-    #             pScoreDate = datetime.strftime(d, '%Y-%m-%d')
-    #             trainingEndDate = pScoreDate
-    #             trainingStartDate = datetime.strftime(datetime.strptime(trainingEndDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
-    #             trainingDataForTraining = extractTrainingData(trainingData, trainingStartDate, trainingEndDate)
-    #             ctx = {'exchange': exchange
-    #                 , 'pScoreDate': pScoreDate
-    #                 , 'trainingStartDate': trainingStartDate
-    #                 , 'trainingEndDate': trainingEndDate
-    #                 , 'index': index
-    #                 , 'exchangeCode': exchangeCode
-    #                 , 'forecastDays': forecastDays
-    #                 , 'forecastor': forecastor
-    #                 , 'trainingDataForTraining': trainingDataForTraining
-    #                 , 'cacheAndRetrainModel': False}
-    #             f = executor.submit(runSpp, ctx, sppMLTrainingDao)
-    #             futures.append(f)
-    #         executor.shutdown()
-    # else:
     modelCache = {}
     for d in rrule(DAILY, dtstart=pScoreStartDate, until=pScoreEndDate):
-        pScoreDate = datetime.strftime(d, '%Y-%m-%d')
+        pScoreDate = d.date()
         trainingEndDate = pScoreDate
-        trainingStartDate = datetime.strftime(datetime.strptime(trainingEndDate, '%Y-%m-%d') - timedelta(days=trainingDataDays), '%Y-%m-%d')
+        trainingStartDate = trainingEndDate - timedelta(days=trainingDataDays)
         trainingDataForTraining = extractTrainingData(trainingData, trainingStartDate, trainingEndDate)
         ctx = {'exchange': exchange
             , 'pScoreDate': pScoreDate

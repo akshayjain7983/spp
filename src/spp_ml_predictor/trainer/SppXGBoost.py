@@ -14,6 +14,8 @@ class SppXGBoost(SppMLForecasterCachedModel):
         model = XGBRegressor(n_estimators=1000, max_depth=train_features.shape[1], random_state=train_features.shape[1]
                            , learning_rate=0.001, booster='gbtree', n_jobs=-1, tree_method='approx')
         model.fit(train_features, train_labels, verbose=False)
+        print(self.ctx['mode'])
+        print(list(zip(model.feature_importances_, train_features)))
         return model
 
     def __getRetrainRegressor__(self, model, modelLastTrainingDate, train_features: pd.DataFrame, train_labels: pd.DataFrame

@@ -12,12 +12,13 @@ class SppSecurityForecastTask(SppForecastTask):
         self.name = "SppSecurityForecastTask"
 
     def __preForecast__(self) -> pd.DataFrame:
+        self.ctx['mode'] = 'security'
         super().__setupCandlestickPatternLags__()
         securityDataForExchangeCodeForTraining = self.trainingDataForForecasting.rename(columns={"close": "value"})
         return securityDataForExchangeCodeForTraining
 
     def __postForecast__(self, trainingDataForForecasting:pd.DataFrame, forecast:pd.DataFrame) -> pd.DataFrame:
-
+        self.ctx['mode'] = None
         forecastDays = self.ctx['forecastDays']
         securityPricePScoreDate = forecast['forecastValues'][0]['value']
         forecastResult = forecast.copy()
@@ -42,8 +43,8 @@ class SppSecurityForecastTask(SppForecastTask):
 
         forecastResult.insert(0, "exchange", trainingDataForForecasting['exchange'][0])
         forecastResult.insert(1, "index", self.forecastIndexReturns['index'][forecastDays[1]])
-        forecastResult.insert(2, "exchangeCode", trainingDataForForecasting['exchangeCode'][0])
-        forecastResult.insert(3, "isin", trainingDataForForecasting['isin'][0])
+        forecastResult.insert(2, "exchange_code", trainingDataForForecasting['exchange_code'][0])
+        forecastResult.insert(3, "security_id", trainingDataForForecasting['security_id'][0])
         forecastResult.insert(4, "date", self.ctx['pScoreDate'])
         forecastResult.insert(5, "lastUpdatedTimestamp", datetime.strftime(datetime.now(timezone.utc), '%Y-%m-%dT%H:%M:%S%z'))
         return forecastResult

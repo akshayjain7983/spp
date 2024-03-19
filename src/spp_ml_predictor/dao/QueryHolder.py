@@ -12,12 +12,11 @@ def __putQuery__(queryFilePath, tag, query):
 
     queryMap[queryTag] = query
 
-def readQueries1(queryFilePath, queryIdPrefix, queryIdPostfix, queryIdSuffixForUnformatted):
+def readQueries1(queryFilePath, queryIdPrefix, queryIdPostfix):
     qf = open(queryFilePath, 'r')
     queryId = None
     query = None
     line = None
-    isFormatted = True
 
     for line in qf:
         if(line.startswith(queryIdPrefix)):
@@ -25,10 +24,9 @@ def readQueries1(queryFilePath, queryIdPrefix, queryIdPostfix, queryIdSuffixForU
                 __putQuery__(queryFilePath, queryId, query)
 
             queryId = line.strip().removeprefix(queryIdPrefix).removesuffix(queryIdPostfix)
-            isFormatted = queryIdSuffixForUnformatted and not queryId.endswith(queryIdSuffixForUnformatted)
             query = ""
         elif(not line == ""):
-            query = query + (line if isFormatted else line.strip())
+            query = query + line
 
     if (queryId):
         __putQuery__(queryFilePath, queryId, query)

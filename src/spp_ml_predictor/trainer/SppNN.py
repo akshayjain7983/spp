@@ -96,6 +96,8 @@ class SppNN(SppMLForecasterCachedModel):
         opt = Adam(learning_rate=0.0001)
         model.compile(optimizer=opt, loss='mean_squared_error')
         model.fit(train_features, train_labels, batch_size=1, epochs=1, verbose=0)
+        print(self.ctx['mode'])
+        print(list(zip(model.feature_importances_, train_features)))
         return model
 
     def __getRetrainRegressor__(self, model, modelLastTrainingDate, train_features: pd.DataFrame, train_labels: pd.DataFrame
