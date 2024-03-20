@@ -52,3 +52,21 @@ SELECT ir.institution, ir."date", ir.rate, ir.rate_type
 FROM spp.inflation_rates ir
 WHERE institution = :institution
 AND rate_type = :rateType
+
+<<saveForecastedPScoreTable>>
+spp.forecast_p_score
+
+<<saveForecastedPScore>>
+UPDATE spp.forecast_p_score
+SET is_active = FALSE
+WHERE
+security_id = :security_id
+AND index_id = :index_id
+AND "date" = :date
+AND forecast_model_name = :forecast_model_name
+AND forecast_period = :forecast_period
+AND is_active = TRUE;
+
+INSERT INTO spp.forecast_p_score
+(security_id, index_id, "date", forecast_model_name, forecast_period, forecast_date, forecasted_index_return, forecasted_security_return, forecasted_p_score)
+VALUES(:security_id, :index_id, :date, :forecast_model_name, :forecast_period, :forecast_date, :forecasted_index_return, :forecasted_security_return, :forecasted_p_score);

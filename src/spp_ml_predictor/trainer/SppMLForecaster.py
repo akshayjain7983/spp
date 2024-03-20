@@ -85,7 +85,7 @@ class SppMLForecaster(SppForecaster):
 
         forecastValues = {
             "forecastModel": self.__getName__(),
-            "forecastValues": [{"forecastPeriod": str(d) + 'D', "forecastDate": pred.index[d].date(), "value": pred['value_lag_0'][d]} for d in forecastDays]
+            "forecastValues": [{"forecastPeriod": str(d) + 'd', "forecastDate": pred.index[d].date(), "value": pred['value_lag_0'].iloc[d]} for d in forecastDays]
         }
 
         return pd.DataFrame(forecastValues, index=forecastDays)

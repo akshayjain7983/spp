@@ -3,7 +3,7 @@ from ..dao import QueryFiles
 from ..dao import QueryHolder
 from sqlalchemy import create_engine
 from sqlalchemy.sql import text
-from configparser import ConfigParser
+from sqlalchemy import insert
 
 class SppMLDao:
 
@@ -88,3 +88,19 @@ class SppMLDao:
             , 'indexLevelsPdf': indexLevelsPdf
             , 'securityPricesPdf': securityPricesPdf
         }
+
+    def saveForecastPScore(self, forecastPScore: pd.DataFrame, ctx: dict):
+
+        forecastedPScoreSql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_SQL, "saveForecastedPScore")
+        data = []
+        for index, row in forecastPScore.iterrows():
+            dbRow = {'security_id':row['security_id'], 'index_id':row['index_id'], 'date':row['date'], 'forecast_model_name':row['forecast_model_name'],
+                             'forecast_period':row['forecast_period'], 'forecast_date':row['forecast_date'], 'forecasted_index_return':row['forecasted_index_return'],
+                             'forecasted_security_return':row['forecasted_security_return'], 'forecasted_p_score':row['forecasted_p_score']}
+            data.append(dbRow)
+
+        print(data)
+
+        with self.engine.connect() as conn:
+            conn.execute(text(forecastedPScoreSql), data)
+            conn.commit()
