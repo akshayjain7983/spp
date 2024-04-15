@@ -99,8 +99,22 @@ class SppMLDao:
                              'forecasted_security_return':row['forecasted_security_return'], 'forecasted_p_score':row['forecasted_p_score']}
             data.append(dbRow)
 
-        print(data)
-
         with self.engine.connect() as conn:
             conn.execute(text(forecastedPScoreSql), data)
             conn.commit()
+
+    def loadForecastPScore(self, ctx:dict) -> pd.DataFrame:
+        forecastedPScoreSql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_SQL, "loadForecastedPScore")
+        forecastedPScore = pd.read_sql_query(text(forecastedPScoreSql)
+                                                , self.engine
+                                                , params=ctx
+                                                , index_col='date')
+        return forecastedPScore
+
+    def loadActualPScore(self, ctx:dict) -> pd.DataFrame:
+        actualPScoreSql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_SQL, "loadActualPScore")
+        actualPScore = pd.read_sql_query(text(actualPScoreSql)
+                                                , self.engine
+                                                , params=ctx
+                                                , index_col='date')
+        return actualPScore

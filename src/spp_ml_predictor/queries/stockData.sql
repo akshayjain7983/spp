@@ -70,3 +70,53 @@ AND is_active = TRUE;
 INSERT INTO spp.forecast_p_score
 (security_id, index_id, "date", forecast_model_name, forecast_period, forecast_date, forecasted_index_return, forecasted_security_return, forecasted_p_score)
 VALUES(:security_id, :index_id, :date, :forecast_model_name, :forecast_period, :forecast_date, :forecasted_index_return, :forecasted_security_return, :forecasted_p_score);
+
+<<loadForecastedPScore>>
+SELECT fps.*
+FROM spp.forecast_p_score fps
+INNER JOIN spp.securities s
+ON fps.security_id = s.id
+AND s.status = 'Active'
+INNER JOIN spp.indices i
+ON fps.index_id = i.id
+AND i.status = 'Active'
+INNER JOIN spp.exchange_segments es
+ON s.exchange_segment_id = es.id
+AND es.status = 'Active'
+INNER JOIN spp.exchanges e
+ON es.exchange_id = e.id
+AND i.exchange_id = e.id
+WHERE
+e."name" = :exchange
+AND i."index" = :index
+AND s.exchange_code = :exchangeCode
+AND fps."date" BETWEEN :startDate AND :endDate
+AND fps.forecast_period = :forecastPeriod
+AND fps.forecast_model_name = :forecastModel
+AND fps.is_active = TRUE
+
+<<loadActualPScore>>
+SELECT aps.*, ir."return" actual_index_return, sr."return" actual_security_return
+FROM spp.actual_p_score aps
+INNER JOIN spp.securities s
+ON aps.security_id = s.id
+AND s.status = 'Active'
+INNER JOIN spp.indices i
+ON aps.index_id = i.id
+AND i.status = 'Active'
+INNER JOIN spp.exchange_segments es
+ON s.exchange_segment_id = es.id
+AND es.status = 'Active'
+INNER JOIN spp.exchanges e
+ON es.exchange_id = e.id
+AND i.exchange_id = e.id
+INNER JOIN spp.index_returns ir
+ON ir.id = aps.index_return_id
+INNER JOIN spp.security_returns sr
+ON sr.id = aps.security_return_id
+WHERE
+e."name" = :exchange
+AND i."index" = :index
+AND s.exchange_code = :exchangeCode
+AND aps."date" BETWEEN :startDate AND :endDate
+AND aps.score_period = :scorePeriod

@@ -17,8 +17,8 @@ class SppNN(SppMLForecasterCachedModel):
     def __setupTrainingData__(self) -> pd.DataFrame:
         trainingData = self.trainingDataPdf[['value']]
 
-        startDate = datetime.strptime(self.ctx['trainingStartDate'], '%Y-%m-%d')
-        endDate = datetime.strptime(self.ctx['trainingEndDate'], '%Y-%m-%d')
+        startDate = self.ctx['trainingStartDate']
+        endDate = self.ctx['trainingEndDate']
         nextForecastDate = endDate + timedelta(days=1)
         trainingDataReindexPdf = pd.date_range(start=startDate, end=nextForecastDate, inclusive="both")
         trainingData = trainingData.reindex(trainingDataReindexPdf)
@@ -36,9 +36,10 @@ class SppNN(SppMLForecasterCachedModel):
 
     def __buildAndForecast__(self, trainingData:pd.DataFrame) -> pd.DataFrame:
 
-        endDate = datetime.strptime(self.ctx['trainingEndDate'], '%Y-%m-%d')
+        endDate = self.ctx['trainingEndDate']
         endDate = endDate - timedelta(days=1)
         nextForecastDate = endDate + timedelta(days=1)
+        nextForecastDateTimeIndex = datetime.combine(nextForecastDate, datetime.min.time())
         forecastDays = self.ctx['forecastDays']
         train = trainingData[:endDate].copy()
         pred:pd.DataFrame = trainingData[nextForecastDate:].copy()
@@ -51,40 +52,42 @@ class SppNN(SppMLForecasterCachedModel):
         dtr = self.__getRegressor__(train_features, train_labels)
 
         for i in range(forecastDays[-1]+1):
-            pred_features = pred.filter(items=[nextForecastDate], axis=0)[[f'value_lag_log_{i+1}' for i in range(self.lags)]]
+            pred_features = pred.filter(items=[nextForecastDateTimeIndex], axis=0)[[f'value_lag_log_{i+1}' for i in range(self.lags)]]
             xtraDataPdfPred = self.xtraDataPdf[self.xtraDataPdf.index.isin(pred_features.index)]
             pred_features = pd.concat([pred_features, xtraDataPdfPred], axis=1)
             pred_features = self.__preparePredFeatures__(pred_features)
-            pred_labels = self.__predict__(dtr, pred_features)
-            nextForecastValueLagLog = pred_labels[0]
+            pred_label = self.__predict__(dtr, pred_features)
+            nextForecastValueLagLog = pred_label
             nextForecastValue = np.exp(nextForecastValueLagLog)
-            pred['value_lag_0'][nextForecastDate] = nextForecastValue
-            pred['value_lag_log_0'][nextForecastDate] = nextForecastValueLagLog
+            pred.loc[nextForecastDateTimeIndex, 'value_lag_0'] = nextForecastValue
+            pred.loc[nextForecastDateTimeIndex, 'value_lag_log_0'] = nextForecastValueLagLog
             thisForecastDate = nextForecastDate
             nextForecastDate = thisForecastDate + timedelta(days=1)
+            nextForecastDateTimeIndex = datetime.combine(nextForecastDate, datetime.min.time())
             nextRow = self.__getNextRow__(pred, nextForecastValue, thisForecastDate)
-            pred.loc[nextForecastDate] = nextRow
+            pred.loc[nextForecastDateTimeIndex] = nextRow
 
         forecastValues = {
             "forecastModel": self.__getName__(),
-            "forecastValues": [{"forecastPeriod": str(d) + 'D', "forecastDate": datetime.strftime(pred.index[d], '%Y-%m-%d'), "value": pred['value_lag_0'][d]} for d in forecastDays]
+            "forecastValues": [{"forecastPeriod": str(d) + 'd', "forecastDate": pred.index[d].date(), "value": pred['value_lag_0'].iloc[d]} for d in forecastDays]
         }
 
         return pd.DataFrame(forecastValues, index=forecastDays)
 
     def __getNextRow__(self, pred:pd.DataFrame, nextForecastValue:float, thisForecastDate:datetime):
         row = []
+        thisForecastDateTimeIndex = datetime.combine(thisForecastDate, datetime.min.time())
         for i in range(self.lags+1):
             if(i == 0):
                 row.append(float("nan"))
             else:
-                row.append(pred[f'value_lag_{i-1}'][thisForecastDate])
+                row.append(pred[f'value_lag_{i-1}'][thisForecastDateTimeIndex])
 
         for i in range(self.lags+1):
             if(i == 0):
                 row.append(float("nan"))
             else:
-                row.append(pred[f'value_lag_log_{i-1}'][thisForecastDate])
+                row.append(pred[f'value_lag_log_{i-1}'][thisForecastDateTimeIndex])
 
         return row
 
@@ -96,8 +99,6 @@ class SppNN(SppMLForecasterCachedModel):
         opt = Adam(learning_rate=0.0001)
         model.compile(optimizer=opt, loss='mean_squared_error')
         model.fit(train_features, train_labels, batch_size=1, epochs=1, verbose=0)
-        print(self.ctx['mode'])
-        print(list(zip(model.feature_importances_, train_features)))
         return model
 
     def __getRetrainRegressor__(self, model, modelLastTrainingDate, train_features: pd.DataFrame, train_labels: pd.DataFrame
@@ -108,4 +109,4 @@ class SppNN(SppMLForecasterCachedModel):
         return model
 
     def __predict__(self, regressor, pred_features:pd.DataFrame):
-        return regressor.predict(pred_features, verbose=0)
+        return regressor.predict(pred_features, verbose=0)[0][0]

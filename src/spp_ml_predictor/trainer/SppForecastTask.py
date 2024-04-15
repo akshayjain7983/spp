@@ -72,7 +72,7 @@ class SppForecastTask:
         candleStickLags = 5
         for i in range(1, candleStickLags):
             self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'] = self.xtraDataPdf['candleStickRealBodyChange'].shift(i)
-            self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'].ffill(limit=(candleStickLags-i), inplace=True)
-            self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'].replace(to_replace=float('NaN'), value=0.0, inplace=True)
-        self.xtraDataPdf['candleStickRealBodyChange'].ffill(limit=candleStickLags, inplace=True)
-        self.xtraDataPdf['candleStickRealBodyChange'].replace(to_replace=float('NaN'), value=0.0, inplace=True)
+            self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'] = self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'].ffill(limit=(candleStickLags-i))
+            self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'] = self.xtraDataPdf[f'candleStickRealBodyChangeLag{i}'].replace(to_replace=float('NaN'), value=0.0)
+        self.xtraDataPdf['candleStickRealBodyChange'] = self.xtraDataPdf['candleStickRealBodyChange'].ffill(limit=candleStickLags)
+        self.xtraDataPdf['candleStickRealBodyChange'] = self.xtraDataPdf['candleStickRealBodyChange'].replace(to_replace=float('NaN'), value=0.0)

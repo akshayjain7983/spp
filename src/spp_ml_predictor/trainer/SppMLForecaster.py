@@ -45,7 +45,7 @@ class SppMLForecaster(SppForecaster):
         return pred_features
 
     def __predict__(self, regressor, pred_features:pd.DataFrame):
-        return regressor.predict(pred_features)
+        return regressor.predict(pred_features)[0]
 
     def __buildAndForecast__(self, trainingData:pd.DataFrame) -> pd.DataFrame:
 
@@ -69,14 +69,14 @@ class SppMLForecaster(SppForecaster):
             xtraDataPdfPred = self.xtraDataPdf[self.xtraDataPdf.index.isin(pred_features.index)]
             pred_features = pd.concat([pred_features, xtraDataPdfPred], axis=1)
             pred_features = self.__preparePredFeatures__(pred_features)
-            pred_labels = self.__predict__(dtr, pred_features)
-            nextForecastValueLagLogDiff1 = pred_labels[0]
+            pred_label = self.__predict__(dtr, pred_features)
+            nextForecastValueLagLogDiff1 = pred_label
             nextForecastValueLagLog1 = pred['value_lag_log_1'][nextForecastDateTimeIndex]
             nextForecastValueLagLog = nextForecastValueLagLog1 + nextForecastValueLagLogDiff1
             nextForecastValue = np.exp(nextForecastValueLagLog)
-            pred['value_lag_0'][nextForecastDateTimeIndex] = nextForecastValue
-            pred['value_lag_log_0'][nextForecastDateTimeIndex] = nextForecastValueLagLog
-            pred['value_lag_log_diff_1'][nextForecastDateTimeIndex] = nextForecastValueLagLogDiff1
+            pred.loc[nextForecastDateTimeIndex, 'value_lag_0'] = nextForecastValue
+            pred.loc[nextForecastDateTimeIndex, 'value_lag_log_0'] = nextForecastValueLagLog
+            pred.loc[nextForecastDateTimeIndex, 'value_lag_log_diff_1'] = nextForecastValueLagLogDiff1
             thisForecastDate = nextForecastDate
             nextForecastDate = thisForecastDate + timedelta(days=1)
             nextForecastDateTimeIndex = datetime.combine(nextForecastDate, datetime.min.time())
