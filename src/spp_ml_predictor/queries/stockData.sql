@@ -120,3 +120,13 @@ AND i."index" = :index
 AND s.exchange_code = :exchangeCode
 AND aps."date" BETWEEN :startDate AND :endDate
 AND aps.score_period = :scorePeriod
+
+<<loadHolidays>>
+WITH RECURSIVE t(d, n) AS (
+    VALUES (COALESCE(:currentDate, current_date),1)
+  UNION ALL
+    SELECT d-1, n+1 FROM t
+    WHERE n <= COALESCE(:days, (10*365))
+)
+SELECT d "date", spp.is_holiday(:exchange, :segment, d) FROM t
+ORDER BY d ASC

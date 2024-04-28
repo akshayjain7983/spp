@@ -44,6 +44,8 @@ class SppMLForecasterCachedModel(SppMLForecaster):
             train_features_next = train_features_next.reindex(newDateRange)
             train_labels_next = train_labels_next.reindex(newDateRange)
 
+        train_features_next.dropna(inplace=True)
+        train_labels_next.dropna(inplace=True)
 
         if(model == None):
             model = self.__getNewRegressor__(train_features, train_labels)

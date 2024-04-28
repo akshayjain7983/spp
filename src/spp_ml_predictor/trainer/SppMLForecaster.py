@@ -2,11 +2,12 @@ import pandas as pd
 from datetime import datetime, date, timedelta
 from ..trainer.SppForecaster import SppForecaster
 import numpy as np
+from ..util import util
 
 class SppMLForecaster(SppForecaster):
     def __init__(self, trainingDataPdf:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
         super().__init__(trainingDataPdf, ctx, xtraDataPdf)
-        self.lags = 15
+        self.lags = 30
 
 
     def forecast(self) -> pd.DataFrame:
@@ -17,14 +18,7 @@ class SppMLForecaster(SppForecaster):
 
     def __setupTrainingData__(self) -> pd.DataFrame:
         trainingData = self.trainingDataPdf[['value']]
-
-        startDate = self.ctx['trainingStartDate']
-        endDate = self.ctx['trainingEndDate']
-        nextForecastDate = endDate + timedelta(days=1)
-        trainingDataReindexPdf = pd.date_range(start=startDate, end=nextForecastDate)
-        trainingData = trainingData.reindex(trainingDataReindexPdf)
         trainingData.sort_index(inplace=True)
-
         trainingData.rename(columns={"value":"value_lag_0"}, inplace=True)
 
         for i in range(self.lags):
@@ -49,14 +43,15 @@ class SppMLForecaster(SppForecaster):
 
     def __buildAndForecast__(self, trainingData:pd.DataFrame) -> pd.DataFrame:
 
+        holidays = self.ctx['holidays']
         endDate = self.ctx['trainingEndDate']
-        endDate = endDate - timedelta(days=1)
-        nextForecastDate = endDate + timedelta(days=1)
+        endDate = util.previous_business_date(endDate, 1, holidays)
+        nextForecastDate = util.next_business_date(endDate, 1, holidays)
         nextForecastDateTimeIndex = datetime.combine(nextForecastDate, datetime.min.time())
         forecastDays = self.ctx['forecastDays']
+        trainingData.dropna(inplace=True)
         train = trainingData[:endDate].copy()
         pred:pd.DataFrame = trainingData[nextForecastDate:].copy()
-        train = train.dropna()
         xtraDataPdfTrain = self.xtraDataPdf[self.xtraDataPdf.index.isin(train.index)]
         train_features = train[[f'value_lag_log_diff_{i+2}' for i in range(self.lags-1)]]
         train_features = pd.concat([train_features, xtraDataPdfTrain], axis=1)
@@ -64,7 +59,7 @@ class SppMLForecaster(SppForecaster):
 
         dtr = self.__getRegressor__(train_features, train_labels)
 
-        for i in range(forecastDays[-1]+1):
+        for i in range(forecastDays+1):
             pred_features = pred.filter(items=[nextForecastDateTimeIndex], axis=0)[[f'value_lag_log_diff_{i+2}' for i in range(self.lags-1)]]
             xtraDataPdfPred = self.xtraDataPdf[self.xtraDataPdf.index.isin(pred_features.index)]
             pred_features = pd.concat([pred_features, xtraDataPdfPred], axis=1)
@@ -78,17 +73,17 @@ class SppMLForecaster(SppForecaster):
             pred.loc[nextForecastDateTimeIndex, 'value_lag_log_0'] = nextForecastValueLagLog
             pred.loc[nextForecastDateTimeIndex, 'value_lag_log_diff_1'] = nextForecastValueLagLogDiff1
             thisForecastDate = nextForecastDate
-            nextForecastDate = thisForecastDate + timedelta(days=1)
+            nextForecastDate = util.next_business_date(thisForecastDate, 1, holidays)
             nextForecastDateTimeIndex = datetime.combine(nextForecastDate, datetime.min.time())
             nextRow = self.__getNextRow__(pred, nextForecastValue, thisForecastDate)
             pred.loc[nextForecastDateTimeIndex] = nextRow
 
         forecastValues = {
             "forecastModel": self.__getName__(),
-            "forecastValues": [{"forecastPeriod": str(d) + 'd', "forecastDate": pred.index[d].date(), "value": pred['value_lag_0'].iloc[d]} for d in forecastDays]
+            "forecastValues": [{"forecastPeriod": str(d) + 'd', "forecastDate": pred.index[d].date(), "value": pred['value_lag_0'].iloc[d]} for d in [0, forecastDays]]
         }
 
-        return pd.DataFrame(forecastValues, index=forecastDays)
+        return pd.DataFrame(forecastValues, index=[0, forecastDays])
 
     def __getNextRow__(self, pred:pd.DataFrame, nextForecastValue:float, thisForecastDate:datetime):
         row = []

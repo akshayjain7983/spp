@@ -16,7 +16,7 @@ if __name__ == '__main__':
     exchangeCode = "500086"
     dateStart = "2018-09-01"
     dateEnd = "2019-08-31"
-    compare = 'security_return'
+    compare = 'pscore'
 
     ctx = {
         'startDate': dateStart

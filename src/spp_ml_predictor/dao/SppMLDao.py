@@ -89,6 +89,13 @@ class SppMLDao:
             , 'securityPricesPdf': securityPricesPdf
         }
 
+    def loadHolidays(self, ctx:dict):
+        holidaysSql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_SQL, "loadHolidays")
+        return pd.read_sql_query(text(holidaysSql)
+                                 , self.engine
+                                 , params=ctx
+                                 , index_col="date")
+
     def saveForecastPScore(self, forecastPScore: pd.DataFrame, ctx: dict):
 
         forecastedPScoreSql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_SQL, "saveForecastedPScore")
