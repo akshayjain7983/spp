@@ -40,7 +40,7 @@ def main(args):
     segment = args[5]
     dataHistoryMonths = args[6]
     forecastor = args[7]
-    exchangeCode = args[8] if len(args) >= 9 else None
+    exchangeCodes = [ec for ec in args[8].split(',')] if len(args) >= 9 else None
 
     trainingDataDays = 31*int(dataHistoryMonths)
 
@@ -57,7 +57,7 @@ def main(args):
         , 'trainingEndDate': pScoreEndDate
         , 'exchange': exchange
         , 'index': index
-        , 'exchangeCode': exchangeCode
+        , 'exchangeCodes': exchangeCodes
         , 'segment': segment
     }
 
@@ -80,12 +80,13 @@ def main(args):
             , 'index': index
             , 'segment': segment
             , 'holidays': holidays
-            , 'exchangeCode': exchangeCode
+            , 'exchangeCodes': exchangeCodes
             , 'forecastDays': forecastDays
             , 'forecastor': forecastor
             , 'trainingDataForTraining': trainingDataForTraining
             , 'cacheAndRetrainModel': True
-            , 'modelCache':modelCache}
+            , 'modelCache':modelCache
+            , 'config': config}
         runSpp(ctx, sppMLTrainingDao)
         modelCache = ctx['modelCache']
 

@@ -3,9 +3,10 @@ import pandas as pd
 from datetime import datetime
 from sklearn.metrics import mean_squared_error
 from math import sqrt
-from src.spp_ml_predictor.config.ConfigReader import readConfig
-from src.spp_ml_predictor.dao.SppMLDao import SppMLDao
-from src.spp_ml_predictor.dao import QueryFiles
+from spp_ml_predictor.config.ConfigReader import readConfig
+# from ..spp_ml_predictor.config.ConfigReader import readConfig
+from spp_ml_predictor.dao.SppMLDao import SppMLDao
+from spp_ml_predictor.dao import QueryFiles
 
 if __name__ == '__main__':
     QueryFiles.load()
@@ -13,7 +14,7 @@ if __name__ == '__main__':
     config = readConfig(configFilename='spp_ml_predictor/config.ini')
     sppMLTrainingDao: SppMLDao = SppMLDao(config)
     forecastModel = "SppNN"
-    exchangeCode = "500086"
+    exchangeCode = "509488"
     dateStart = "2018-09-01"
     dateEnd = "2019-08-31"
     compare = 'pscore'
@@ -23,7 +24,7 @@ if __name__ == '__main__':
         , 'endDate': dateEnd
         , 'exchange': 'BSE'
         , 'index': 'SENSEX'
-        , 'exchangeCode': exchangeCode
+        , 'exchangeCodes': [exchangeCode]
         , 'forecastModel': forecastModel
         , 'forecastPeriod': forecastPeriod
         , 'scorePeriod': forecastPeriod

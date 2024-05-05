@@ -24,3 +24,12 @@ def previous_business_date(endDate: date, days: int, holidays: pd.DataFrame):
             count += 1
 
     return businessDate
+
+def candlestick_movement(open:float, close:float):
+    return (close / open - 1) if(open != 0.0) else 0.0
+
+def candlestick_real_body_change(open:float, close:float):
+    return (close / open) if(open != 0.0) else 0.0
+
+def candlestick_full_body_change(low:float, high:float):
+    return (high / low) if(low != 0.0) else 0.0

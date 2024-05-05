@@ -1,0 +1,47 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "visualize -> Python Debugger",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "visualize",
+            "cwd": "${workspaceFolder}/src",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONUNBUFFERED": "1",
+                "PYDEVD_USE_CYTHON": "NO",
+                "PYDEVD_USE_FRAME_EVAL": "NO"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "spp_ml_predictor -> Python Debugger ",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "spp_ml_predictor",
+            "args": [
+                "2018-09-01",
+                "2019-08-31",
+                "10",
+                "BSE",
+                "SENSEX",
+                "EQUITY",
+                "120",
+                "SppNN",
+                "509488"
+            ],
+            "cwd": "${workspaceFolder}/src",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONUNBUFFERED": "1",
+                "PYDEVD_USE_CYTHON": "NO",
+                "PYDEVD_USE_FRAME_EVAL": "NO"
+            },
+            "justMyCode": false
+        }
+    ]
+}

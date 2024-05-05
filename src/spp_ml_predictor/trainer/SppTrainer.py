@@ -6,6 +6,7 @@ from concurrent.futures import *
 from datetime import datetime, timedelta
 import time
 from ..util import util
+import os
 
 class SppTrainer:
     def __init__(self, sppMLTrainingDao:SppMLDao, ctx:dict):
@@ -24,7 +25,7 @@ class SppTrainer:
         xtraDataPdf:pd.DataFrame = interestRatesPdf.drop(['institution', 'rate_type'], axis=1)
         xtraDataPdf.rename(columns={"rate": "repo"}, inplace=True)
         xtraDataPdf['inflation'] = inflationRatesPdf['rate']
-        xtraDataPdf['candleStickRealBodyChange'] = securityPricesPdfLocal['candleStickRealBodyChange']
+        xtraDataPdf['candlestickMovement'] = securityPricesPdfLocal['candlestickMovement']
 
         sppTrainingTask = SppSecurityForecastTask(forecastIndexReturns, securityPricesPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
@@ -42,7 +43,7 @@ class SppTrainer:
         xtraDataPdf = interestRatesPdf.drop(['institution', 'rate_type'], axis=1)
         xtraDataPdf.rename(columns={"rate": "repo"}, inplace=True)
         xtraDataPdf['inflation'] = inflationRatesPdf['rate']
-        xtraDataPdf['candleStickRealBodyChange'] = indexLevelsPdfLocal['candleStickRealBodyChange']
+        xtraDataPdf['candlestickMovement'] = indexLevelsPdfLocal['candlestickMovement']
 
         sppTrainingTask = SppIndexForecastTask(indexLevelsPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
@@ -68,10 +69,13 @@ class SppTrainer:
 
         if(multithread):
             futures = []
-            with ThreadPoolExecutor(max_workers=8) as executor:
-                for ec in exchangeCodePdf['exchangeCode']:
+            with ThreadPoolExecutor(max_workers=int(os.cpu_count()*0.75)) as executor:
+                for ec in exchangeCodePdf['exchange_code']:
+                    securityPricesPdfForEc = securityPricesPdf[securityPricesPdf['exchange_code'] == ec]
+                    if(securityPricesPdfForEc.shape[0] < indexLevelsPdf.shape[0]):
+                        continue # not full data set for training so ignore this security
                     future = executor.submit(self.__submitForSppSecurityForecastTask__, forecastIndexReturns
-                                             , securityPricesPdf[securityPricesPdf['exchange_code'] == ec]
+                                             , securityPricesPdfForEc
                                              , interestRatesPdf, inflationRatesPdf)
                     futures.append(future)
 

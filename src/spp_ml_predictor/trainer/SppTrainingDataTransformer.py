@@ -1,6 +1,7 @@
 import pandas as pd
 from ..trainer import SppCandleStick
 import numpy as np
+from ..util import util
 
 class SppTrainingDataTransformer:
     def __init__(self, trainingData:dict, trainingDataCtx:dict):
@@ -21,26 +22,16 @@ class SppTrainingDataTransformer:
         securityPricesPdf.sort_index(inplace=True)
         self.trainingData['securityPricesPdf'] = securityPricesPdf
 
-    def __initCandleStick__(self, row):
-        return SppCandleStick.SppCandleStick(row['open'], row['high'], row['low'], row['close'])
+    def __candlestick_movement__(self, row):
+        return util.candlestick_movement(row['open'], row['close'])
 
     def __determineIndexCandlestickPatterns__(self):
         indexLevelsPdf: pd.DataFrame = self.trainingData['indexLevelsPdf']
-        indexLevelsPdf['candlestick'] = indexLevelsPdf.apply(self.__initCandleStick__, axis=1)
-
-        for i in range(len(indexLevelsPdf)):
-            c0 = indexLevelsPdf.iloc[i]['candlestick']
-            candleStickRealBodyChange = c0.movement
-            indexLevelsPdf.loc[indexLevelsPdf.index[i], 'candleStickRealBodyChange'] = candleStickRealBodyChange
+        indexLevelsPdf['candlestickMovement'] = indexLevelsPdf.apply(self.__candlestick_movement__, axis=1)
 
     def __determineSecurityCandlestickPatterns__(self):
         securityPricesPdf: pd.DataFrame = self.trainingData['securityPricesPdf']
-        securityPricesPdf['candlestick'] = securityPricesPdf.apply(self.__initCandleStick__, axis=1)
-
-        for i in range(len(securityPricesPdf)):
-            c0 = securityPricesPdf.iloc[i]['candlestick']
-            candleStickRealBodyChange = c0.movement
-            securityPricesPdf.loc[securityPricesPdf.index[i], 'candleStickRealBodyChange'] = candleStickRealBodyChange
+        securityPricesPdf['candlestickMovement'] = securityPricesPdf.apply(self.__candlestick_movement__, axis=1)
 
 
     def transform(self):

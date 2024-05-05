@@ -3,7 +3,6 @@ from ..dao import QueryFiles
 from ..dao import QueryHolder
 from sqlalchemy import create_engine
 from sqlalchemy.sql import text
-from sqlalchemy import insert
 
 class SppMLDao:
 
@@ -12,9 +11,11 @@ class SppMLDao:
 
     def loadSecurityExchangeCodes(self, ctx) -> pd.DataFrame:
         exchange = ctx['exchange']
-        exchange_code_global = ctx['exchangeCode']
+        exchangeCodes = ctx['exchangeCodes']
         security_codes_sql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_SQL, "loadSecurityExchangeCodes")
-        security_codes_sql = security_codes_sql.format((("AND exchange_code IN('"+exchange_code_global+"')") if exchange_code_global else ''))
+        exchangeCodes = ["'"+ec+"'" for ec in exchangeCodes] if exchangeCodes else None
+        security_codes_sql_ecs = ','.join(exchangeCodes) if exchangeCodes else None
+        security_codes_sql = security_codes_sql.format((("AND exchange_code IN("+security_codes_sql_ecs+")") if security_codes_sql_ecs else ''))
         return pd.read_sql_query(text(security_codes_sql), self.engine, params={'exchange': exchange})
 
     def loadSecurityPrices(self, exchangeCodesList, ctx) -> pd.DataFrame:
@@ -112,6 +113,10 @@ class SppMLDao:
 
     def loadForecastPScore(self, ctx:dict) -> pd.DataFrame:
         forecastedPScoreSql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_SQL, "loadForecastedPScore")
+        exchangeCodes = ctx['exchangeCodes']
+        exchangeCodes = ["'"+ec+"'" for ec in exchangeCodes] if exchangeCodes else None
+        forecastedPScoreSql_ecs = ','.join(exchangeCodes) if exchangeCodes else None
+        forecastedPScoreSql = forecastedPScoreSql.format(forecastedPScoreSql_ecs)
         forecastedPScore = pd.read_sql_query(text(forecastedPScoreSql)
                                                 , self.engine
                                                 , params=ctx
@@ -120,6 +125,10 @@ class SppMLDao:
 
     def loadActualPScore(self, ctx:dict) -> pd.DataFrame:
         actualPScoreSql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_SQL, "loadActualPScore")
+        exchangeCodes = ctx['exchangeCodes']
+        exchangeCodes = ["'"+ec+"'" for ec in exchangeCodes] if exchangeCodes else None
+        actualPScoreSql_ecs = ','.join(exchangeCodes) if exchangeCodes else None
+        actualPScoreSql = actualPScoreSql.format(actualPScoreSql_ecs)
         actualPScore = pd.read_sql_query(text(actualPScoreSql)
                                                 , self.engine
                                                 , params=ctx

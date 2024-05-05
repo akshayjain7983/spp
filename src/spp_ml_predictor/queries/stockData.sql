@@ -89,7 +89,7 @@ AND i.exchange_id = e.id
 WHERE
 e."name" = :exchange
 AND i."index" = :index
-AND s.exchange_code = :exchangeCode
+AND s.exchange_code IN ({})
 AND fps."date" BETWEEN :startDate AND :endDate
 AND fps.forecast_period = :forecastPeriod
 AND fps.forecast_model_name = :forecastModel
@@ -117,7 +117,7 @@ ON sr.id = aps.security_return_id
 WHERE
 e."name" = :exchange
 AND i."index" = :index
-AND s.exchange_code = :exchangeCode
+AND s.exchange_code IN ({})
 AND aps."date" BETWEEN :startDate AND :endDate
 AND aps.score_period = :scorePeriod
 
