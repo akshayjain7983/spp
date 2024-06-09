@@ -21,6 +21,9 @@ class SppTrainer:
 
         securityPricesPdfLocal = securityPricesPdf.copy()
         securityPricesPdfLocal.sort_index(inplace=True)
+        trainingDataForTraining:dict = self.ctx['trainingDataForTraining']
+        indexLevelsPdf = trainingDataForTraining['indexLevelsPdf']
+        securityPricesPdfLocal = securityPricesPdfLocal.reindex(indexLevelsPdf.index, method='ffill')
 
         xtraDataPdf:pd.DataFrame = interestRatesPdf.drop(['institution', 'rate_type'], axis=1)
         xtraDataPdf.rename(columns={"rate": "repo"}, inplace=True)
@@ -65,20 +68,23 @@ class SppTrainer:
         inflationRatesPdf = self.setupInflationRates(inflationRatesPdf)
         forecastIndexReturns = self.__submitForSppIndexForecastTask__(indexLevelsPdf, interestRatesPdf, inflationRatesPdf)
 
+        minSecurityPricesData = int(indexLevelsPdf.shape[0] * 0.99)
+        securityPricesPdf =securityPricesPdf.groupby('exchange_code').filter(lambda x: len(x) > minSecurityPricesData)
+        
         multithread:bool = exchangeCodePdf['exchange_code'].size > 1
 
         if(multithread):
             futures = []
-            with ThreadPoolExecutor(max_workers=int(os.cpu_count()*0.75)) as executor:
+            with ThreadPoolExecutor(max_workers=int(os.cpu_count()*0.5)) as executor:
                 for ec in exchangeCodePdf['exchange_code']:
                     securityPricesPdfForEc = securityPricesPdf[securityPricesPdf['exchange_code'] == ec]
-                    if(securityPricesPdfForEc.shape[0] < indexLevelsPdf.shape[0]):
-                        continue # not full data set for training so ignore this security
-                    future = executor.submit(self.__submitForSppSecurityForecastTask__, forecastIndexReturns
-                                             , securityPricesPdfForEc
-                                             , interestRatesPdf, inflationRatesPdf)
-                    futures.append(future)
-
+                    if(securityPricesPdfForEc.shape[0] > 0):
+                        future = executor.submit(self.__submitForSppSecurityForecastTask__, forecastIndexReturns
+                                                , securityPricesPdfForEc
+                                                , interestRatesPdf, inflationRatesPdf)
+                        futures.append(future)
+                    else:
+                        print("Training data not enough for "+ec)
 
             for f in futures:
                 try:

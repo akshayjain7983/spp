@@ -24,15 +24,15 @@
             "request": "launch",
             "module": "spp_ml_predictor",
             "args": [
-                "2018-09-01",
-                "2019-08-31",
-                "10",
-                "BSE",
-                "SENSEX",
-                "EQUITY",
-                "120",
-                "SppNN",
-                "509488"
+                "2018-09-01"
+                , "2019-08-31"
+                , "10"
+                , "BSE"
+                , "SENSEX"
+                , "EQUITY"
+                , "120"
+                , "SppNN"
+                , "500086"
             ],
             "cwd": "${workspaceFolder}/src",
             "console": "integratedTerminal",

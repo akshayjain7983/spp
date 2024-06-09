@@ -1,8 +1,14 @@
 import pandas as pd
 from ..trainer.SppMLForecasterCachedModel import SppMLForecasterCachedModel
+import tensorflow as tf
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
+import keras_tuner as kt
+from scikeras.wrappers import KerasRegressor
+from scipy.stats import reciprocal
+from sklearn.model_selection import RandomizedSearchCV
 from datetime import datetime
 import numpy as np
 from ..util import util
@@ -13,6 +19,7 @@ class SppNN(SppMLForecasterCachedModel):
     def __init__(self, trainingDataPdf:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
         super().__init__(trainingDataPdf, ctx, xtraDataPdf)
         self.name = "SppNN"
+        self.model_loss_function = "mean_absolute_percentage_error"
 
     def __getName__(self):
         return self.name
@@ -65,13 +72,13 @@ class SppNN(SppMLForecasterCachedModel):
         train_labels = train['value_lag_log_0']
         previousValue = train['value_lag_0'].iloc[-1]
 
-        dtr = self.__getRegressor__(train_features, train_labels)
+        model = self.__getRegressor__(train_features, train_labels)
 
-        for i in range(forecastDays*2+1):
+        for i in range(forecastDays+1):
             if(i > 0): #no need to predict day 0
                 pred_features = pred.filter(items=[nextForecastDateTimeIndex], axis=0)[train_features_cols]
                 pred_features = self.__preparePredFeatures__(pred_features)
-                pred_label = self.__predict__(dtr, pred_features)
+                pred_label = self.__predict__(model, pred_features)
                 nextForecastValueLagLog = pred_label
                 nextForecastValue = np.exp(nextForecastValueLagLog)
                 candleStickRealBodyChangeLag0 = util.candlestick_movement(previousValue, nextForecastValue) #assuming previous close is today's open
@@ -88,12 +95,14 @@ class SppNN(SppMLForecasterCachedModel):
             pred.loc[nextForecastDateTimeIndex] = nextRow
             previousValue = nextForecastValue
 
+        del model
+
         forecastValues = {
             "forecastModel": self.__getName__(),
-            "forecastValues": [{"forecastPeriod": str(d) + 'd', "forecastDate": pred.index[d].date(), "value": pred['value_lag_0'].iloc[d]} for d in [forecastDays, forecastDays*2]]
+            "forecastValues": [{"forecastPeriod": str(d) + 'd', "forecastDate": pred.index[d].date(), "value": pred['value_lag_0'].iloc[d]} for d in [0, forecastDays]]
         }
 
-        return pd.DataFrame(forecastValues, index=[forecastDays, forecastDays*2])
+        return pd.DataFrame(forecastValues, index=[0, forecastDays])
 
     def __getNextRow__(self, pred:pd.DataFrame, nextForecastValue:float, thisForecastDate:datetime, nextForecastDate:datetime):
         row = []
@@ -125,37 +134,67 @@ class SppNN(SppMLForecasterCachedModel):
                 row.append(pred[f'candlestickMovementLag{i - 1}'][thisForecastDateTimeIndex])
 
         return row
+    
+    def __build_model_callable__(self):
+
+        def __build_model__(hp)->Sequential:
+         
+            modelTemp = Sequential()
+            n_neurons = hp.Int('neurons', min_value=256, max_value=1024, step=64)
+            n_hidden = hp.Int('hidden_layers', min_value=1, max_value=4, step=1)
+            learning_rate = hp.Choice('learning_rate', values=[1e-3, 1e-4, 1e-5, 1e-6])
+            
+            for layer in range(n_hidden):
+                modelTemp.add(Dense(n_neurons, activation='relu'))
+
+            modelTemp.add(Dense(1))
+            opt = Adam(learning_rate=learning_rate)
+            modelTemp.compile(optimizer=opt, loss=self.model_loss_function)
+            return modelTemp
+        
+        return __build_model__
+
+    def __getTuner__(self, x, y, validation_split=0.0):
+        batch_size, epochs = self.__getBatchSizeEpochs__(x)
+        root_dir = self.ctx['config']['ml-models.location']
+        keras_tuner_dir = root_dir+'keras-tuner/'+self.name+'/'
+        mode = self.ctx['mode']
+        keras_tuner_sub_dir = None
+        if (mode == 'index'):
+            keras_tuner_sub_dir = self.ctx['index']
+        else:
+            keras_tuner_sub_dir = self.trainingDataPdf.iloc[0]['exchange_code']
+
+        tuner = kt.RandomSearch(self.__build_model_callable__(),
+                            objective=kt.Objective('val_loss', direction='min'),
+                            max_trials=10,
+                            executions_per_trial=5,
+                            overwrite=False,
+                            directory=keras_tuner_dir,
+                            project_name=keras_tuner_sub_dir)
+
+        x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=validation_split, shuffle=False)
+        stop_early = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.05, patience=8, start_from_epoch=3)
+        tuner.search(x_train, y_train, epochs=epochs, batch_size=batch_size, validation_data=(x_val, y_val), callbacks=[stop_early])
+        return tuner
 
     def __getNewRegressor__(self, train_features: pd.DataFrame, train_labels: pd.DataFrame):
 
-        x, x_test, y, y_test = train_test_split(train_features, train_labels, test_size=0.2, shuffle=False)
-        x_train, x_valid, y_train, y_valid = train_test_split(x, y, test_size=0.1, shuffle=False)
-        rmse = 100
-        count = 1
         model = None
-        while(rmse > 0.005 and count < 5):
-            modelTemp = Sequential()
-            modelTemp.add(Dense(512, activation='relu'))
-            modelTemp.add(Dense(512, activation='relu'))
-            modelTemp.add(Dense(1))
-            opt = Adam(learning_rate=0.00001)
-            modelTemp.compile(optimizer=opt, loss='mean_squared_error', metrics=['root_mean_squared_error'])
-            batch_size, epochs = self.__getBatchSizeEpochs__(x)
-            modelTemp.fit(x_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(x_valid, y_valid), verbose=0)
-            mse_test = modelTemp.evaluate(x_test, y_test, verbose=0)
-            rmseTemp = mse_test[1]
-            if(rmseTemp < rmse):
-                rmse = rmseTemp
-                model = modelTemp
-            count += 1
+        batch_size, epochs = self.__getBatchSizeEpochs__(train_features)
+        tuner = self.__getTuner__(train_features, train_labels, 0.2)
+        best_hps=tuner.get_best_hyperparameters(num_trials=1)[0]
+        model = tuner.hypermodel.build(best_hps)
+        model.fit(train_features, train_labels, epochs=epochs, batch_size=batch_size, verbose=0)
         return model
 
     def __getRetrainRegressor__(self, model, modelLastTrainingDate, train_features: pd.DataFrame, train_labels: pd.DataFrame
                                 , train_features_next: pd.DataFrame, train_labels_next: pd.DataFrame):
-        opt = Adam(learning_rate=0.000001)
-        model.compile(optimizer=opt, loss='mean_squared_error')
+        
         batch_size, epochs = self.__getBatchSizeEpochs__(train_features_next)
-        model.fit(train_features_next, train_labels_next, batch_size=batch_size, epochs=epochs, verbose=0)
+        opt = Adam(learning_rate=1e-6)
+        model.compile(optimizer=opt, loss=self.model_loss_function)
+        model.fit(train_features_next, train_labels_next, epochs=epochs, batch_size=batch_size, verbose=0)
         return model
 
     def __getBatchSizeEpochs__(self, train_features):
@@ -169,19 +208,20 @@ class SppNN(SppMLForecasterCachedModel):
         return regressor.predict(pred_features, verbose=0)[0][0]
 
     def __load_model__(self):
-        fileName = self.__find_model_filename()
+        fileName = self.__find_model_filename__()
         if(fileName):
             model = load_model(fileName)
             modelInUseLastTrainingDate = self.__find_modelInUseLastTrainingDate__(fileName)
             return model, modelInUseLastTrainingDate
         else:
             return super().__load_model__()
+    
     def __find_modelInUseLastTrainingDate__(self, fileName:str):
         dateStr = fileName.split('.')[0].split('__')[3]
         return datetime.strptime(dateStr, '%Y-%m-%d')
 
-    def __find_model_filename(self):
-        fileName = self.__build_model_filename(None)
+    def __find_model_filename__(self):
+        fileName = self.__build_model_filename__(None)
         arr = glob.glob(fileName, root_dir=self.ctx['config']['ml-models.location'])
         if (len(arr) == 0):
             return None
@@ -190,17 +230,17 @@ class SppNN(SppMLForecasterCachedModel):
         fileName = arr[-1]
         return fileName
 
-    def __persist_model__(self, modelCacheForKey: dict):
-        fileName = self.__find_model_filename()
+    def __persist_model__(self, modelCache: dict):
+        fileName = self.__find_model_filename__()
         if (fileName):
             os.remove(fileName)
 
-        modelInUse = modelCacheForKey['modelInUse']
-        modelInUseLastTrainingDate = modelCacheForKey['modelInUseLastTrainingDate']
-        fileName = self.__build_model_filename(modelInUseLastTrainingDate)
+        modelInUse = modelCache['modelInUse']
+        modelInUseLastTrainingDate = modelCache['modelInUseLastTrainingDate']
+        fileName = self.__build_model_filename__(modelInUseLastTrainingDate)
         modelInUse.save(fileName)
 
-    def __build_model_filename(self, modelInUseLastTrainingDate):
+    def __build_model_filename__(self, modelInUseLastTrainingDate):
         mode = self.ctx['mode']
         fileName = self.ctx['config']['ml-models.location']
         fileName += 'SPP-ML-Model__' + self.__getName__() + '__';

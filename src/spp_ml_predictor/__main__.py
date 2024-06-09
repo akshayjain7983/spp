@@ -65,7 +65,6 @@ def main(args):
     transformer:SppTrainingDataTransformer = SppTrainingDataTransformer.SppTrainingDataTransformer(trainingData, trainingDataCtx)
     trainingData = transformer.transform()
 
-    modelCache = {}
     for d in rrule(DAILY, dtstart=pScoreStartDate, until=pScoreEndDate):
         pScoreDate = d.date()
         if(util.is_holiday(pScoreDate, holidays)):
@@ -84,11 +83,8 @@ def main(args):
             , 'forecastDays': forecastDays
             , 'forecastor': forecastor
             , 'trainingDataForTraining': trainingDataForTraining
-            , 'cacheAndRetrainModel': True
-            , 'modelCache':modelCache
             , 'config': config}
         runSpp(ctx, sppMLTrainingDao)
-        modelCache = ctx['modelCache']
 
 if __name__ == '__main__':
     main(sys.argv[1:])

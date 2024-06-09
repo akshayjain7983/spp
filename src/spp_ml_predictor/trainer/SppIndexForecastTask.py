@@ -19,11 +19,11 @@ class SppIndexForecastTask(SppForecastTask):
         forecastDays = self.ctx['forecastDays']
 
         forecastResult = forecast.copy()
-        forecastResult.drop(index=(forecastDays*2), inplace=True)
+        forecastResult.drop(index=0, inplace=True)
         forecastResult.insert(0, "index_id", trainingDataForForecasting['index_id'].iloc[0])
         forecastResult.insert(1, "date", self.ctx['pScoreDate'])
 
-        indexLevelsPScoreDate = forecast['forecastValues'].loc[forecastDays]['value']
-        forecastResult.at[forecastDays, 'indexReturns'] = forecast['forecastValues'].loc[forecastDays*2]['value'] / indexLevelsPScoreDate - 1
+        indexLevelsPScoreDate = forecast['forecastValues'].loc[0]['value']
+        forecastResult.at[forecastDays, 'indexReturns'] = forecast['forecastValues'].loc[forecastDays]['value'] / indexLevelsPScoreDate - 1
         return forecastResult
 

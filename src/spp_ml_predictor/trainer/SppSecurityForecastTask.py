@@ -20,9 +20,9 @@ class SppSecurityForecastTask(SppForecastTask):
     def __postForecast__(self, trainingDataForForecasting:pd.DataFrame, forecast:pd.DataFrame) -> pd.DataFrame:
         self.ctx['mode'] = None
         forecastDays = self.ctx['forecastDays']
-        securityPricePScoreDate = forecast['forecastValues'].loc[forecastDays]['value']
+        securityPricePScoreDate = forecast['forecastValues'].loc[0]['value']
         forecastResult = forecast.copy()
-        forecastResult.drop(index=(forecastDays*2), inplace=True)
+        forecastResult.drop(index=(0), inplace=True)
         forecastResult.insert(loc=len(forecastResult.columns), column="forecast_period", value="")
         forecastResult.insert(loc=len(forecastResult.columns), column="forecast_date", value="")
         forecastResult.insert(loc=len(forecastResult.columns), column="forecasted_index_return", value=float('nan'))
@@ -30,7 +30,7 @@ class SppSecurityForecastTask(SppForecastTask):
         forecastResult.insert(loc=len(forecastResult.columns), column="forecasted_p_score", value=float('nan'))
         forecastResult.rename(columns={"forecastModel": "forecast_model_name"}, inplace=True)
         forecastResult.drop("forecastValues", axis=1, inplace=True)
-        forecastedSecurityPrice = forecast['forecastValues'].loc[forecastDays*2]['value']
+        forecastedSecurityPrice = forecast['forecastValues'].loc[forecastDays]['value']
         forecastedSecurityReturn = forecastedSecurityPrice / securityPricePScoreDate - 1
         forecastedIndexReturn = self.forecastIndexReturns['indexReturns'].loc[forecastDays]
         forecastedPScore = (forecastedSecurityReturn - forecastedIndexReturn) * 100

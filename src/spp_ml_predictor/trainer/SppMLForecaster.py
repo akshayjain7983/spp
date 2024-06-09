@@ -80,12 +80,12 @@ class SppMLForecaster(SppForecaster):
         train_labels = train['value_lag_log_diff_1']
         previousValue = train['value_lag_0'].iloc[-1]
 
-        dtr = self.__getRegressor__(train_features, train_labels)
+        model = self.__getRegressor__(train_features, train_labels)
 
         for i in range(forecastDays+1):
             pred_features = pred.filter(items=[nextForecastDateTimeIndex], axis=0)[train_features_cols]
             pred_features = self.__preparePredFeatures__(pred_features)
-            pred_label = self.__predict__(dtr, pred_features)
+            pred_label = self.__predict__(model, pred_features)
             nextForecastValueLagLogDiff1 = pred_label
             nextForecastValueLagLog1 = pred['value_lag_log_1'][nextForecastDateTimeIndex]
             nextForecastValueLagLog = nextForecastValueLagLog1 + nextForecastValueLagLogDiff1
@@ -101,6 +101,8 @@ class SppMLForecaster(SppForecaster):
             nextRow = self.__getNextRow__(pred, nextForecastValue, thisForecastDate, nextForecastDate)
             pred.loc[nextForecastDateTimeIndex] = nextRow
             previousValue = nextForecastValue
+
+        del model
 
         forecastValues = {
             "forecastModel": self.__getName__(),
