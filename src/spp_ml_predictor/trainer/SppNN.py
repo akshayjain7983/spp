@@ -174,18 +174,14 @@ class SppNN(SppMLForecasterCachedModel):
                             project_name=keras_tuner_sub_dir)
 
         x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=validation_split, shuffle=False)
-        stop_early = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.05, patience=8, start_from_epoch=3)
+        stop_early = EarlyStopping(monitor='val_loss', mode='min', min_delta=5, patience=8, start_from_epoch=3)
         tuner.search(x_train, y_train, epochs=epochs, batch_size=batch_size, validation_data=(x_val, y_val), callbacks=[stop_early])
         return tuner
 
     def __getNewRegressor__(self, train_features: pd.DataFrame, train_labels: pd.DataFrame):
 
-        model = None
-        batch_size, epochs = self.__getBatchSizeEpochs__(train_features)
         tuner = self.__getTuner__(train_features, train_labels, 0.2)
-        best_hps=tuner.get_best_hyperparameters(num_trials=1)[0]
-        model = tuner.hypermodel.build(best_hps)
-        model.fit(train_features, train_labels, epochs=epochs, batch_size=batch_size, verbose=0)
+        model = tuner.get_best_models()[0]
         return model
 
     def __getRetrainRegressor__(self, model, modelLastTrainingDate, train_features: pd.DataFrame, train_labels: pd.DataFrame
