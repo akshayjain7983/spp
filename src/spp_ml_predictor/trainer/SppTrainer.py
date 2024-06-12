@@ -75,7 +75,7 @@ class SppTrainer:
 
         if(multithread):
             futures = []
-            with ThreadPoolExecutor(max_workers=int(os.cpu_count()*0.5)) as executor:
+            with ThreadPoolExecutor(max_workers=int(os.cpu_count()*0.75)) as executor:
                 for ec in exchangeCodePdf['exchange_code']:
                     securityPricesPdfForEc = securityPricesPdf[securityPricesPdf['exchange_code'] == ec]
                     if(securityPricesPdfForEc.shape[0] > 0):
@@ -83,8 +83,6 @@ class SppTrainer:
                                                 , securityPricesPdfForEc
                                                 , interestRatesPdf, inflationRatesPdf)
                         futures.append(future)
-                    else:
-                        print("Training data not enough for "+ec)
 
             for f in futures:
                 try:

@@ -19,7 +19,8 @@ class SppNN(SppMLForecasterCachedModel):
     def __init__(self, trainingDataPdf:pd.DataFrame, ctx:dict, xtraDataPdf:pd.DataFrame):
         super().__init__(trainingDataPdf, ctx, xtraDataPdf)
         self.name = "SppNN"
-        self.model_loss_function = "mean_absolute_percentage_error"
+        self.model_loss_function = "mean_absolute_error"
+        self.model_metrics = ["root_mean_squared_error"]
 
     def __getName__(self):
         return self.name
@@ -137,19 +138,20 @@ class SppNN(SppMLForecasterCachedModel):
     
     def __build_model_callable__(self):
 
-        def __build_model__(hp)->Sequential:
+        def __build_model__(hp:kt.HyperParameters)->Sequential:
          
             modelTemp = Sequential()
-            n_neurons = hp.Int('neurons', min_value=256, max_value=1024, step=64)
-            n_hidden = hp.Int('hidden_layers', min_value=1, max_value=4, step=1)
-            learning_rate = hp.Choice('learning_rate', values=[1e-3, 1e-4, 1e-5, 1e-6])
-            
+            n_neurons = hp.Int('neurons', min_value=256, max_value=2048, step=64)
+            n_hidden = hp.Int('hidden_layers', min_value=1, max_value=7, step=1)
+            learning_rate = hp.Choice('learning_rate', values=[1e-3/4, 1e-3/2, 1e-3, 1e-4/4, 1e-4/2, 1e-4, 1e-5/4, 1e-5/2, 1e-5, 1e-6/4, 1e-6/2, 1e-6])
+            n_neurons_layer = n_neurons
             for layer in range(n_hidden):
-                modelTemp.add(Dense(n_neurons, activation='relu'))
+                modelTemp.add(Dense(n_neurons_layer, activation='relu'))
+                n_neurons_layer = int(n_neurons_layer/2) + 1
 
             modelTemp.add(Dense(1))
             opt = Adam(learning_rate=learning_rate)
-            modelTemp.compile(optimizer=opt, loss=self.model_loss_function)
+            modelTemp.compile(optimizer=opt, loss=self.model_loss_function, metrics=self.model_metrics)
             return modelTemp
         
         return __build_model__
@@ -165,16 +167,16 @@ class SppNN(SppMLForecasterCachedModel):
         else:
             keras_tuner_sub_dir = self.trainingDataPdf.iloc[0]['exchange_code']
 
-        tuner = kt.RandomSearch(self.__build_model_callable__(),
-                            objective=kt.Objective('val_loss', direction='min'),
-                            max_trials=10,
-                            executions_per_trial=5,
+        monitor = 'val_'+self.model_metrics[0]
+        tuner = kt.Hyperband(self.__build_model_callable__(),
+                            objective=kt.Objective(monitor, direction='min'),
+                            max_epochs=epochs,
                             overwrite=False,
                             directory=keras_tuner_dir,
                             project_name=keras_tuner_sub_dir)
 
         x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=validation_split, shuffle=False)
-        stop_early = EarlyStopping(monitor='val_loss', mode='min', min_delta=5, patience=8, start_from_epoch=3)
+        stop_early = EarlyStopping(monitor=monitor, mode='min', min_delta=0.001, patience=3, start_from_epoch=3)
         tuner.search(x_train, y_train, epochs=epochs, batch_size=batch_size, validation_data=(x_val, y_val), callbacks=[stop_early])
         return tuner
 
