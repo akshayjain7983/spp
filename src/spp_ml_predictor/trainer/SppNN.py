@@ -29,6 +29,7 @@ class SppNN(SppMLForecasterCachedModel):
         trainingData = self.trainingDataPdf[['value']]
         trainingData.sort_index(inplace=True)
         trainingData.rename(columns={"value":"value_lag_0"}, inplace=True)
+
         concatLags = (trainingData, )
         for i in range(self.lags):
             concatLags = concatLags + (trainingData['value_lag_0'].shift(i+1).rename(f'value_lag_{i+1}'), )
@@ -76,18 +77,15 @@ class SppNN(SppMLForecasterCachedModel):
         model = self.__getRegressor__(train_features, train_labels)
 
         for i in range(forecastDays+1):
-
             pred_features = pred.filter(items=[nextForecastDateTimeIndex], axis=0)[train_features_cols]
             pred_features = self.__preparePredFeatures__(pred_features)
             pred_label = self.__predict__(model, pred_features)
             nextForecastValueLagLog = pred_label
             nextForecastValue = np.exp(nextForecastValueLagLog)
-            candleStickRealBodyChangeLag0 = util.candlestick_movement(previousValue,
-                                                                      nextForecastValue)  # assuming previous close is today's open
+            candleStickRealBodyChangeLag0 = util.candlestick_movement(previousValue, nextForecastValue)  # assuming previous close is today's open
             pred.loc[nextForecastDateTimeIndex, 'value_lag_0'] = nextForecastValue
             pred.loc[nextForecastDateTimeIndex, 'value_lag_log_0'] = nextForecastValueLagLog
             pred.loc[nextForecastDateTimeIndex, 'candlestickMovementLag0'] = candleStickRealBodyChangeLag0
-
             thisForecastDate = nextForecastDate
             nextForecastDate = util.next_business_date(thisForecastDate, 1, holidays)
             nextForecastDateTimeIndex = datetime.combine(nextForecastDate, datetime.min.time())
@@ -175,7 +173,7 @@ class SppNN(SppMLForecasterCachedModel):
                             project_name=keras_tuner_sub_dir)
 
         x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=validation_split, shuffle=False)
-        stop_early = EarlyStopping(monitor=monitor, mode='min', min_delta=0.001, patience=3, start_from_epoch=3)
+        stop_early = EarlyStopping(monitor=monitor, mode='min', min_delta=1e-4, patience=3, start_from_epoch=3)
         tuner.search(x_train, y_train, epochs=epochs, batch_size=batch_size, validation_data=(x_val, y_val), callbacks=[stop_early])
         return tuner
 
