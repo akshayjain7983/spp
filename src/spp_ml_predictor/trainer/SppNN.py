@@ -76,18 +76,17 @@ class SppNN(SppMLForecasterCachedModel):
         model = self.__getRegressor__(train_features, train_labels)
 
         for i in range(forecastDays+1):
-            if(i > 0): #no need to predict day 0
-                pred_features = pred.filter(items=[nextForecastDateTimeIndex], axis=0)[train_features_cols]
-                pred_features = self.__preparePredFeatures__(pred_features)
-                pred_label = self.__predict__(model, pred_features)
-                nextForecastValueLagLog = pred_label
-                nextForecastValue = np.exp(nextForecastValueLagLog)
-                candleStickRealBodyChangeLag0 = util.candlestick_movement(previousValue, nextForecastValue) #assuming previous close is today's open
-                pred.loc[nextForecastDateTimeIndex, 'value_lag_0'] = nextForecastValue
-                pred.loc[nextForecastDateTimeIndex, 'value_lag_log_0'] = nextForecastValueLagLog
-                pred.loc[nextForecastDateTimeIndex, 'candlestickMovementLag0'] = candleStickRealBodyChangeLag0
-            else:
-                nextForecastValue = pred.at[nextForecastDateTimeIndex, 'value_lag_0']
+
+            pred_features = pred.filter(items=[nextForecastDateTimeIndex], axis=0)[train_features_cols]
+            pred_features = self.__preparePredFeatures__(pred_features)
+            pred_label = self.__predict__(model, pred_features)
+            nextForecastValueLagLog = pred_label
+            nextForecastValue = np.exp(nextForecastValueLagLog)
+            candleStickRealBodyChangeLag0 = util.candlestick_movement(previousValue,
+                                                                      nextForecastValue)  # assuming previous close is today's open
+            pred.loc[nextForecastDateTimeIndex, 'value_lag_0'] = nextForecastValue
+            pred.loc[nextForecastDateTimeIndex, 'value_lag_log_0'] = nextForecastValueLagLog
+            pred.loc[nextForecastDateTimeIndex, 'candlestickMovementLag0'] = candleStickRealBodyChangeLag0
 
             thisForecastDate = nextForecastDate
             nextForecastDate = util.next_business_date(thisForecastDate, 1, holidays)
