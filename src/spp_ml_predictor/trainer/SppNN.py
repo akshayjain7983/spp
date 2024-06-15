@@ -1,3 +1,4 @@
+import keras_tuner
 import pandas as pd
 from ..trainer.SppMLForecasterCachedModel import SppMLForecasterCachedModel
 import tensorflow as tf
@@ -136,7 +137,7 @@ class SppNN(SppMLForecasterCachedModel):
     def __build_model_callable__(self):
 
         def __build_model__(hp:kt.HyperParameters)->Sequential:
-         
+
             modelTemp = Sequential()
             n_neurons = hp.Int('neurons', min_value=256, max_value=2048, step=64)
             n_hidden = hp.Int('hidden_layers', min_value=1, max_value=7, step=1)
@@ -158,19 +159,20 @@ class SppNN(SppMLForecasterCachedModel):
         root_dir = self.ctx['config']['ml-models.location']
         keras_tuner_dir = root_dir+'keras-tuner/'+self.name+'/'
         mode = self.ctx['mode']
-        keras_tuner_sub_dir = None
+        entityId = None
         if (mode == 'index'):
-            keras_tuner_sub_dir = self.ctx['index']
+            entityId = self.ctx['index']
         else:
-            keras_tuner_sub_dir = self.trainingDataPdf.iloc[0]['exchange_code']
+            entityId = self.trainingDataPdf.iloc[0]['exchange_code']
 
         monitor = 'val_'+self.model_metrics[0]
         tuner = kt.Hyperband(self.__build_model_callable__(),
                             objective=kt.Objective(monitor, direction='min'),
+                            hyperparameters=keras_tuner.HyperParameters(),
                             max_epochs=epochs,
                             overwrite=False,
                             directory=keras_tuner_dir,
-                            project_name=keras_tuner_sub_dir)
+                            project_name=entityId)
 
         x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=validation_split, shuffle=False)
         stop_early = EarlyStopping(monitor=monitor, mode='min', min_delta=1e-4, patience=3, start_from_epoch=3)

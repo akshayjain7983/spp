@@ -32,7 +32,7 @@ class SppTrainer:
 
         sppTrainingTask = SppSecurityForecastTask(forecastIndexReturns, securityPricesPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
-        self.sppMLTrainingDao.saveForecastPScore(forecast, self.ctx)
+        # self.sppMLTrainingDao.saveForecastPScore(forecast, self.ctx)
         return forecast;
 
     def __submitForSppIndexForecastTask__(self
@@ -75,7 +75,8 @@ class SppTrainer:
 
         if(multithread):
             futures = []
-            with ThreadPoolExecutor(max_workers=int(os.cpu_count()*0.75)) as executor:
+            max_workers = int(os.cpu_count()*0.5)+1
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 for ec in exchangeCodePdf['exchange_code']:
                     securityPricesPdfForEc = securityPricesPdf[securityPricesPdf['exchange_code'] == ec]
                     if(securityPricesPdfForEc.shape[0] > 0):
