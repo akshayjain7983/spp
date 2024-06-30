@@ -13,7 +13,7 @@ from .util import util
 def runSpp(ctx:dict, sppMLTrainingDao: SppMLTrainingDao):
 
     sppTrainer:SppTrainer = SppTrainer.SppTrainer(sppMLTrainingDao, ctx)
-    sppTrainer.train()
+    sppTrainer.forecastForIndexAndSecurity()
 
 
 def extractTrainingData(trainingData:dict, trainingStartDate, trainingEndDate):
@@ -65,6 +65,8 @@ def main(args):
     transformer:SppTrainingDataTransformer = SppTrainingDataTransformer.SppTrainingDataTransformer(trainingData, trainingDataCtx)
     trainingData = transformer.transform()
 
+    isFirstDate = True
+
     for d in rrule(DAILY, dtstart=pScoreStartDate, until=pScoreEndDate):
         pScoreDate = d.date()
         if(util.is_holiday(pScoreDate, holidays)):
@@ -74,6 +76,7 @@ def main(args):
         trainingDataForTraining = extractTrainingData(trainingData, trainingStartDate, trainingEndDate)
         ctx = {'exchange': exchange
             , 'pScoreDate': pScoreDate
+            , 'isFirstDate':isFirstDate
             , 'trainingStartDate': trainingStartDate
             , 'trainingEndDate': trainingEndDate
             , 'index': index
@@ -85,6 +88,7 @@ def main(args):
             , 'trainingDataForTraining': trainingDataForTraining
             , 'config': config}
         runSpp(ctx, sppMLTrainingDao)
+        isFirstDate = False
 
 if __name__ == '__main__':
     main(sys.argv[1:])

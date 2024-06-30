@@ -53,9 +53,6 @@ FROM spp.inflation_rates ir
 WHERE institution = :institution
 AND rate_type = :rateType
 
-<<saveForecastedPScoreTable>>
-spp.forecast_p_score
-
 <<saveForecastedPScore>>
 UPDATE spp.forecast_p_score
 SET is_active = FALSE
@@ -70,6 +67,54 @@ AND is_active = TRUE;
 INSERT INTO spp.forecast_p_score
 (security_id, index_id, "date", forecast_model_name, forecast_period, forecast_date, forecasted_index_return, forecasted_security_return, forecasted_p_score)
 VALUES(:security_id, :index_id, :date, :forecast_model_name, :forecast_period, :forecast_date, :forecasted_index_return, :forecasted_security_return, :forecasted_p_score);
+
+<<saveForecastedIndexReturn>>
+UPDATE spp.forecast_index_returns
+SET is_active = FALSE,
+last_updated_timestamp = now()
+WHERE
+index_id = :index_id
+AND "date" = :date
+AND forecast_model_name = :forecast_model_name
+AND forecast_period = :forecast_period
+AND is_active = TRUE;
+
+INSERT INTO spp.forecast_index_returns
+(index_id, "date", forecast_model_name, forecast_period, forecast_date, forecasted_level, forecasted_return)
+VALUES(:index_id, :date, :forecast_model_name, :forecast_period, :forecast_date, :forecasted_level, :forecasted_return);
+
+<<saveForecastedSecurityReturn>>
+UPDATE spp.forecast_security_returns
+SET is_active = FALSE,
+last_updated_timestamp = now()
+WHERE
+security_id = :security_id
+AND "date" = :date
+AND forecast_model_name = :forecast_model_name
+AND forecast_period = :forecast_period
+AND is_active = TRUE;
+
+INSERT INTO spp.forecast_security_returns
+(security_id, "date", forecast_model_name, forecast_period, forecast_date, forecasted_price, forecasted_return)
+VALUES(:security_id, :date, :forecast_model_name, :forecast_period, :forecast_date, :forecasted_price, :forecasted_return);
+
+
+<<loadForecastedIndexReturns>>
+SELECT fis.*
+FROM spp.forecast_index_returns fis
+INNER JOIN spp.indices i
+ON fis.index_id = i.id
+AND i.status = 'Active'
+INNER JOIN spp.exchanges e
+ON i.exchange_id = e.id
+WHERE
+e."name" = :exchange
+AND i."index" = :index
+AND fis."date" = :pScoreDate
+AND fis.forecast_period = concat(:forecastDays, 'd')
+AND fis.forecast_model_name = :forecastor
+AND fis.is_active = TRUE
+
 
 <<loadForecastedPScore>>
 SELECT fps.*

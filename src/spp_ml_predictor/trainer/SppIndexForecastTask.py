@@ -22,8 +22,16 @@ class SppIndexForecastTask(SppForecastTask):
         forecastResult.drop(index=0, inplace=True)
         forecastResult.insert(0, "index_id", trainingDataForForecasting['index_id'].iloc[0])
         forecastResult.insert(1, "date", self.ctx['pScoreDate'])
+        forecastResult.rename(columns={"forecastModel": "forecast_model_name"}, inplace=True)
+        forecastResult.insert(loc=len(forecastResult.columns), column="forecast_period", value="")
+        forecastResult.insert(loc=len(forecastResult.columns), column="forecast_date", value="")
+        forecastResult.insert(loc=len(forecastResult.columns), column="forecasted_level", value=float('nan'))
+        forecastResult.insert(loc=len(forecastResult.columns), column="forecasted_return", value=float('nan'))
+        forecastResult.at[forecastDays, "forecast_period"] = forecast['forecastValues'].loc[forecastDays]['forecastPeriod']
+        forecastResult.at[forecastDays, "forecast_date"] = forecast['forecastValues'].loc[forecastDays]['forecastDate']
 
         indexLevelsPScoreDate = forecast['forecastValues'].loc[0]['value']
-        forecastResult.at[forecastDays, 'indexReturns'] = forecast['forecastValues'].loc[forecastDays]['value'] / indexLevelsPScoreDate - 1
+        forecastResult.at[forecastDays, 'forecasted_level'] = forecast['forecastValues'].loc[forecastDays]['value']
+        forecastResult.at[forecastDays, 'forecasted_return'] = forecast['forecastValues'].loc[forecastDays]['value'] / indexLevelsPScoreDate - 1
         return forecastResult
 

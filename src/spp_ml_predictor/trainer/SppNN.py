@@ -1,12 +1,14 @@
+import gc
 import keras_tuner
 import pandas as pd
 from ..trainer.SppMLForecasterCachedModel import SppMLForecasterCachedModel
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, LeakyReLU
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping, Callback
 import keras_tuner as kt
+import keras
 from scikeras.wrappers import KerasRegressor
 from scipy.stats import reciprocal
 from sklearn.model_selection import RandomizedSearchCV
@@ -95,6 +97,7 @@ class SppNN(SppMLForecasterCachedModel):
             previousValue = nextForecastValue
 
         del model
+        keras.backend.clear_session()
 
         forecastValues = {
             "forecastModel": self.__getName__(),
@@ -137,7 +140,7 @@ class SppNN(SppMLForecasterCachedModel):
     def __build_model_callable__(self):
 
         def __build_model__(hp:kt.HyperParameters)->Sequential:
-
+            keras.backend.clear_session()
             modelTemp = Sequential()
             n_neurons = hp.Int('neurons', min_value=256, max_value=2048, step=64)
             n_hidden = hp.Int('hidden_layers', min_value=1, max_value=7, step=1)

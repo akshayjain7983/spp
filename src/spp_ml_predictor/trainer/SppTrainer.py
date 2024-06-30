@@ -1,12 +1,15 @@
-from ..dao import SppMLDao
-import pandas as pd
-from ..trainer.SppSecurityForecastTask import SppSecurityForecastTask
-from ..trainer.SppIndexForecastTask import SppIndexForecastTask
-from concurrent.futures import *
-from datetime import datetime, timedelta
-import time
-from ..util import util
 import os
+import time
+from concurrent.futures import *
+from datetime import datetime
+
+import pandas as pd
+
+from ..dao import SppMLDao
+from ..trainer.SppIndexForecastTask import SppIndexForecastTask
+from ..trainer.SppSecurityForecastTask import SppSecurityForecastTask
+from ..util import util
+
 
 class SppTrainer:
     def __init__(self, sppMLTrainingDao:SppMLDao, ctx:dict):
@@ -14,7 +17,6 @@ class SppTrainer:
         self.ctx = ctx
 
     def __submitForSppSecurityForecastTask__(self
-                                             , forecastIndexReturns:pd.DataFrame
                                              , securityPricesPdf:pd.DataFrame
                                              , interestRatesPdf:pd.DataFrame
                                              , inflationRatesPdf:pd.DataFrame) -> pd.DataFrame:
@@ -30,9 +32,9 @@ class SppTrainer:
         xtraDataPdf['inflation'] = inflationRatesPdf['rate']
         xtraDataPdf['candlestickMovement'] = securityPricesPdfLocal['candlestickMovement']
 
-        sppTrainingTask = SppSecurityForecastTask(forecastIndexReturns, securityPricesPdfLocal, self.ctx, xtraDataPdf)
+        sppTrainingTask = SppSecurityForecastTask(securityPricesPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
-        # self.sppMLTrainingDao.saveForecastPScore(forecast, self.ctx)
+        self.sppMLTrainingDao.saveForecastSecurityReturns(forecast, self.ctx)
         return forecast;
 
     def __submitForSppIndexForecastTask__(self
@@ -50,50 +52,36 @@ class SppTrainer:
 
         sppTrainingTask = SppIndexForecastTask(indexLevelsPdfLocal, self.ctx, xtraDataPdf)
         forecast = sppTrainingTask.forecast()
+        self.sppMLTrainingDao.saveForecastIndexReturns(forecast, self.ctx)
         return forecast;
 
 
-    def train(self):
-
-        startT = time.time()
-
-        trainingDataForTraining:dict = self.ctx['trainingDataForTraining']
+    def forecastForIndex(self):
+        trainingDataForTraining: dict = self.ctx['trainingDataForTraining']
         indexLevelsPdf = trainingDataForTraining['indexLevelsPdf']
-        securityPricesPdf = trainingDataForTraining['securityPricesPdf']
         interestRatesPdf = trainingDataForTraining['interestRatesPdf']
         inflationRatesPdf = trainingDataForTraining['inflationRatesPdf']
-        exchangeCodePdf = trainingDataForTraining['exchangeCodePdf']
-
         interestRatesPdf = self.setupInterestRates(interestRatesPdf)
         inflationRatesPdf = self.setupInflationRates(inflationRatesPdf)
         forecastIndexReturns = self.__submitForSppIndexForecastTask__(indexLevelsPdf, interestRatesPdf, inflationRatesPdf)
 
-        minSecurityPricesData = int(indexLevelsPdf.shape[0] * 0.99)
-        securityPricesPdf =securityPricesPdf.groupby('exchange_code').filter(lambda x: len(x) > minSecurityPricesData)
-        
-        multithread:bool = exchangeCodePdf['exchange_code'].size > 1
+    def forecastForSecurity(self):
+        trainingDataForTraining: dict = self.ctx['trainingDataForTraining']
+        exchangeCodePdf = trainingDataForTraining['exchangeCodePdf']
+        securityPricesPdf = trainingDataForTraining['securityPricesPdf']
+        interestRatesPdf = trainingDataForTraining['interestRatesPdf']
+        inflationRatesPdf = trainingDataForTraining['inflationRatesPdf']
+        interestRatesPdf = self.setupInterestRates(interestRatesPdf)
+        inflationRatesPdf = self.setupInflationRates(inflationRatesPdf)
+        forecast = self.__submitForSppSecurityForecastTask__(securityPricesPdf, interestRatesPdf, inflationRatesPdf)
 
-        if(multithread):
-            futures = []
-            max_workers = int(os.cpu_count()*0.5)+1
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                for ec in exchangeCodePdf['exchange_code']:
-                    securityPricesPdfForEc = securityPricesPdf[securityPricesPdf['exchange_code'] == ec]
-                    if(securityPricesPdfForEc.shape[0] > 0):
-                        future = executor.submit(self.__submitForSppSecurityForecastTask__, forecastIndexReturns
-                                                , securityPricesPdfForEc
-                                                , interestRatesPdf, inflationRatesPdf)
-                        futures.append(future)
 
-            for f in futures:
-                try:
-                    print(f.result())
-                except Exception:
-                    print(f.exception())
+    def forecastForIndexAndSecurity(self):
 
-        else:
-            forecast = self.__submitForSppSecurityForecastTask__(forecastIndexReturns, securityPricesPdf, interestRatesPdf, inflationRatesPdf)
-            print(forecast)
+        startT = time.time()
+
+        # self.forecastForIndex()
+        self.forecastForSecurity()
 
         endT = time.time()
         print("SppTrainer - "+datetime.strftime(self.ctx['pScoreDate'], '%Y-%m-%d`1')+" - Time taken:" + str(endT - startT) + " secs")
