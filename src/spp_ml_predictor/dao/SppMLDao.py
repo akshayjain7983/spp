@@ -73,20 +73,30 @@ class SppMLDao:
         inflationRates = inflationRates.reindex(inflationRatesReindexPdf, method='ffill')
         return inflationRates
 
-    def loadTrainingData(self, ctx:dict):
+    def loadTrainingDataForIndex(self, ctx:dict):
+
+        interestRatesPdf: pd.DataFrame = self.loadInterestRates("Reserve Bank of India", "repo")
+        inflationRatesPdf: pd.DataFrame = self.loadInflationRates("Reserve Bank of India","CPI - YoY - General")
+        indexLevelsPdf: pd.DataFrame = self.loadIndexLevels(ctx)
+
+        return {
+            'interestRatesPdf': interestRatesPdf
+            , 'inflationRatesPdf': inflationRatesPdf
+            , 'indexLevelsPdf': indexLevelsPdf
+        }
+
+    def loadTrainingDataForSecurity(self, ctx:dict):
 
         exchangeCodePdf: pd.DataFrame = self.loadSecurityExchangeCodes(ctx)
         exchangeCodePdf = exchangeCodePdf[["exchange_code"]].copy()
         interestRatesPdf: pd.DataFrame = self.loadInterestRates("Reserve Bank of India", "repo")
         inflationRatesPdf: pd.DataFrame = self.loadInflationRates("Reserve Bank of India","CPI - YoY - General")
-        indexLevelsPdf: pd.DataFrame = self.loadIndexLevels(ctx)
         securityPricesPdf: pd.DataFrame = self.loadSecurityPrices(exchangeCodePdf['exchange_code'], ctx)
 
         return {
             'interestRatesPdf': interestRatesPdf
             , 'inflationRatesPdf': inflationRatesPdf
             , 'exchangeCodePdf': exchangeCodePdf
-            , 'indexLevelsPdf': indexLevelsPdf
             , 'securityPricesPdf': securityPricesPdf
         }
 

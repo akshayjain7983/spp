@@ -1,32 +1,37 @@
+import os
+import subprocess
+import sys
+import pathlib
+import time
+
 import pandas as pd
-from .dao import SppMLTrainingDao
 from .dao import SppMLDao
 from .dao import QueryFiles
 from .trainer import SppTrainer
 from .trainer import SppTrainingDataTransformer
-import sys
 from datetime import datetime, timedelta
 from dateutil.rrule import rrule, DAILY
 from .config.ConfigReader import readConfig
 from .util import util
+from concurrent.futures import ThreadPoolExecutor
 
-def runSpp(ctx:dict, sppMLTrainingDao: SppMLTrainingDao):
+def triggerSubProcessForForecasting(ctx:dict):
+    pypath = sys.executable
+    childProcess = subprocess.Popen([pypath
+                                        , '-m'
+                                        , 'spp_ml_predictor.trainer'
+                                        , ctx['trainerInvocationMode']
+                                        , ctx['pScoreDate']
+                                        , ctx['forecastDays']
+                                        , ctx['exchange']
+                                        , ctx['dataHistoryMonths']
+                                        , ctx['forecastor']
+                                        , ctx['segment']
+                                        , ctx['subjectCode']
+                                     ])
 
-    sppTrainer:SppTrainer = SppTrainer.SppTrainer(sppMLTrainingDao, ctx)
-    sppTrainer.forecastForIndexAndSecurity()
-
-
-def extractTrainingData(trainingData:dict, trainingStartDate, trainingEndDate):
-
-    indexLevelsPdf:pd.DataFrame = trainingData['indexLevelsPdf']
-    indexLevelsPdfForTraining = indexLevelsPdf[(indexLevelsPdf.date >= trainingStartDate) & (indexLevelsPdf.date <= trainingEndDate)]
-    securityPricesPdf:pd.DataFrame = trainingData['securityPricesPdf']
-    securityPricesPdfForTraining = securityPricesPdf[(securityPricesPdf.date >= trainingStartDate) & (securityPricesPdf.date <= trainingEndDate)]
-
-    trainingDataCopy = trainingData.copy()
-    trainingDataCopy['indexLevelsPdf'] = indexLevelsPdfForTraining
-    trainingDataCopy['securityPricesPdf'] = securityPricesPdfForTraining
-    return trainingDataCopy
+    while(childProcess.poll() == None):
+        time.sleep(1)
 
 def main(args):
     config = readConfig(configFilename = 'spp_ml_predictor/config.ini')
@@ -52,43 +57,47 @@ def main(args):
                                                 , 'days': trainingDataDays*2
                                             })
 
-    trainingStartDate = util.previous_business_date(pScoreStartDate, trainingDataDays, holidays)
-    trainingDataCtx = {'trainingStartDate': trainingStartDate
-        , 'trainingEndDate': pScoreEndDate
-        , 'exchange': exchange
-        , 'index': index
-        , 'exchangeCodes': exchangeCodes
-        , 'segment': segment
-    }
-
-    trainingData:dict = sppMLTrainingDao.loadTrainingData(trainingDataCtx)
-    transformer:SppTrainingDataTransformer = SppTrainingDataTransformer.SppTrainingDataTransformer(trainingData, trainingDataCtx)
-    trainingData = transformer.transform()
-
-    isFirstDate = True
-
+    # first do index returns for whole date range
     for d in rrule(DAILY, dtstart=pScoreStartDate, until=pScoreEndDate):
         pScoreDate = d.date()
         if(util.is_holiday(pScoreDate, holidays)):
             continue
-        trainingEndDate = pScoreDate
-        trainingStartDate = util.previous_business_date(trainingEndDate, trainingDataDays, holidays)
-        trainingDataForTraining = extractTrainingData(trainingData, trainingStartDate, trainingEndDate)
-        ctx = {'exchange': exchange
-            , 'pScoreDate': pScoreDate
-            , 'isFirstDate':isFirstDate
-            , 'trainingStartDate': trainingStartDate
-            , 'trainingEndDate': trainingEndDate
-            , 'index': index
+
+        ctx = {'trainerInvocationMode': 'index'
+            , 'exchange': exchange
+            , 'pScoreDate': datetime.strftime(pScoreDate, '%Y-%m-%d')
+            , 'subjectCode': index
             , 'segment': segment
-            , 'holidays': holidays
-            , 'exchangeCodes': exchangeCodes
-            , 'forecastDays': forecastDays
+            , 'forecastDays': str(forecastDays)
             , 'forecastor': forecastor
-            , 'trainingDataForTraining': trainingDataForTraining
-            , 'config': config}
-        runSpp(ctx, sppMLTrainingDao)
-        isFirstDate = False
+            , 'dataHistoryMonths': dataHistoryMonths}
+
+        triggerSubProcessForForecasting(ctx)
+
+    # next do security returns for whole date range
+    for d in rrule(DAILY, dtstart=pScoreStartDate, until=pScoreEndDate):
+        pScoreDate = d.date()
+        if(util.is_holiday(pScoreDate, holidays)):
+            continue
+
+        multi = len(exchangeCodes) > 1
+
+        if(multi):
+            max_workers = int(os.cpu_count() * 0.5) + 1
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                for ec in exchangeCodes:
+                    ctx = {'trainerInvocationMode': 'security'
+                        , 'exchange': exchange
+                        , 'pScoreDate': datetime.strftime(pScoreDate, '%Y-%m-%d')
+                        , 'subjectCode': ec
+                        , 'segment': segment
+                        , 'forecastDays': str(forecastDays)
+                        , 'forecastor': forecastor
+                        , 'dataHistoryMonths': dataHistoryMonths}
+
+                    executor.submit(triggerSubProcessForForecasting, ctx)
+        else:
+            triggerSubProcessForForecasting(ctx)
 
 if __name__ == '__main__':
     main(sys.argv[1:])

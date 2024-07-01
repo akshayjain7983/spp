@@ -23,10 +23,6 @@ class SppTrainer:
 
         securityPricesPdfLocal = securityPricesPdf.copy()
         securityPricesPdfLocal.sort_index(inplace=True)
-        trainingDataForTraining:dict = self.ctx['trainingDataForTraining']
-        indexLevelsPdf = trainingDataForTraining['indexLevelsPdf']
-        securityPricesPdfLocal = securityPricesPdfLocal.reindex(indexLevelsPdf.index, method='ffill')
-
         xtraDataPdf:pd.DataFrame = interestRatesPdf.drop(['institution', 'rate_type'], axis=1)
         xtraDataPdf.rename(columns={"rate": "repo"}, inplace=True)
         xtraDataPdf['inflation'] = inflationRatesPdf['rate']
@@ -67,8 +63,16 @@ class SppTrainer:
 
     def forecastForSecurity(self):
         trainingDataForTraining: dict = self.ctx['trainingDataForTraining']
-        exchangeCodePdf = trainingDataForTraining['exchangeCodePdf']
         securityPricesPdf = trainingDataForTraining['securityPricesPdf']
+
+        trainingStartDate = self.ctx['trainingStartDate']
+        trainingEndDate = self.ctx['trainingEndDate']
+        businessDates = util.business_date_range(trainingStartDate, trainingEndDate, self.ctx['holidays'])
+        minDataDays = int(len(businessDates)*0.99)
+        dataDays = securityPricesPdf.shape[0]
+        if(dataDays < minDataDays):
+            return
+
         interestRatesPdf = trainingDataForTraining['interestRatesPdf']
         inflationRatesPdf = trainingDataForTraining['inflationRatesPdf']
         interestRatesPdf = self.setupInterestRates(interestRatesPdf)
@@ -80,7 +84,7 @@ class SppTrainer:
 
         startT = time.time()
 
-        # self.forecastForIndex()
+        self.forecastForIndex()
         self.forecastForSecurity()
 
         endT = time.time()
