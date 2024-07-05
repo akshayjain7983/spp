@@ -53,21 +53,6 @@ FROM spp.inflation_rates ir
 WHERE institution = :institution
 AND rate_type = :rateType
 
-<<saveForecastedPScore>>
-UPDATE spp.forecast_p_score
-SET is_active = FALSE
-WHERE
-security_id = :security_id
-AND index_id = :index_id
-AND "date" = :date
-AND forecast_model_name = :forecast_model_name
-AND forecast_period = :forecast_period
-AND is_active = TRUE;
-
-INSERT INTO spp.forecast_p_score
-(security_id, index_id, "date", forecast_model_name, forecast_period, forecast_date, forecasted_index_return, forecasted_security_return, forecasted_p_score)
-VALUES(:security_id, :index_id, :date, :forecast_model_name, :forecast_period, :forecast_date, :forecasted_index_return, :forecasted_security_return, :forecasted_p_score);
-
 <<saveForecastedIndexReturn>>
 UPDATE spp.forecast_index_returns
 SET is_active = FALSE,
@@ -117,28 +102,29 @@ AND fis.is_active = TRUE
 
 
 <<loadForecastedPScore>>
-SELECT fps.*
+SELECT fps."date", fir.forecasted_return AS forecasted_index_return, fsr.forecasted_return AS forecasted_security_return, fps.forecasted_p_score
 FROM spp.forecast_p_score fps
-INNER JOIN spp.securities s
-ON fps.security_id = s.id
-AND s.status = 'Active'
+INNER JOIN spp.forecast_index_returns fir
+ON fir.id = fps.forecast_index_returns_id
+AND fir.is_active = TRUE
+INNER JOIN spp.forecast_security_returns fsr
+ON fsr.id = fps.forecast_security_returns_id
+AND fsr.is_active = TRUE
 INNER JOIN spp.indices i
-ON fps.index_id = i.id
+ON i.id = fir.index_id
 AND i.status = 'Active'
-INNER JOIN spp.exchange_segments es
-ON s.exchange_segment_id = es.id
-AND es.status = 'Active'
 INNER JOIN spp.exchanges e
-ON es.exchange_id = e.id
-AND i.exchange_id = e.id
+ON e.id = i.exchange_id
+INNER JOIN spp.securities s
+ON s.id = fsr.security_id
+AND s.status = 'Active'
 WHERE
 e."name" = :exchange
 AND i."index" = :index
+AND fir."date" BETWEEN :startDate AND :endDate
+AND fir.forecast_model_name = :forecastModel
+AND fir.forecast_period = :forecastPeriod
 AND s.exchange_code IN ({})
-AND fps."date" BETWEEN :startDate AND :endDate
-AND fps.forecast_period = :forecastPeriod
-AND fps.forecast_model_name = :forecastModel
-AND fps.is_active = TRUE
 
 <<loadActualPScore>>
 SELECT aps.*, ir."return" actual_index_return, sr."return" actual_security_return
@@ -175,3 +161,38 @@ WITH RECURSIVE t(d, n) AS (
 )
 SELECT d "date", spp.is_holiday(:exchange, :segment, d) FROM t
 ORDER BY d ASC
+
+<<saveForecastedPScore>>
+INSERT INTO spp.forecast_p_score ("date", forecast_index_returns_id, forecast_security_returns_id, forecasted_p_score)
+SELECT fir."date", fir.id AS forecast_index_returns_id, fsr.id AS forecast_security_returns_id, (fsr.forecasted_return - fir.forecasted_return) * 100 AS forecasted_p_score
+FROM spp.forecast_index_returns fir
+INNER JOIN spp.forecast_security_returns fsr
+ON fir."date" = fsr."date"
+AND fir.forecast_model_name = fsr.forecast_model_name
+AND fir.forecast_period = fsr.forecast_period
+AND fir.is_active = TRUE
+AND fsr.is_active = TRUE
+INNER JOIN spp.indices i
+ON i.id = fir.index_id
+AND i.status = 'Active'
+INNER JOIN spp.exchanges e
+ON e.id = i.exchange_id
+INNER JOIN spp.securities s
+ON s.id = fsr.security_id
+AND s.status = 'Active'
+INNER JOIN spp.exchange_segments es
+ON es.id = s.exchange_segment_id
+AND es.exchange_id = e.id
+LEFT OUTER JOIN spp.forecast_p_score fps
+ON fps.forecast_index_returns_id = fir.id
+AND fps.forecast_security_returns_id = fsr.id
+WHERE
+e."name" = :exchange
+AND i."index" = :index
+AND es."name" = :segment
+AND fir."date" = :pScoreDate
+AND fir.forecast_model_name = :forecastor
+AND fir.forecast_period = :forecastPeriod
+AND (fps.forecast_index_returns_id IS NULL
+		OR fps.forecast_security_returns_id IS NULL)
+AND s.exchange_code IN ({})

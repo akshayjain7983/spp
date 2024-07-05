@@ -1,5 +1,4 @@
 import pandas as pd
-from ..dao import SppMLTrainingDao
 from ..dao.SppMLDao import SppMLDao
 from ..dao import QueryFiles
 from ..trainer.SppTrainer import SppTrainer

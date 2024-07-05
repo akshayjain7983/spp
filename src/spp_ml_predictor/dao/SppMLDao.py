@@ -119,9 +119,8 @@ class SppMLDao:
                      'forecasted_level': row['forecasted_level'], 'forecasted_return': row['forecasted_return']}
             data.append(dbRow)
 
-        with self.engine.connect() as conn:
+        with self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
             conn.execute(text(forecastedIndexReturnSql), data)
-            conn.commit()
 
     def saveForecastSecurityReturns(self, forecastSecurityReturns: pd.DataFrame, ctx: dict):
 
@@ -134,31 +133,21 @@ class SppMLDao:
                      'forecasted_price': row['forecasted_price'], 'forecasted_return': row['forecasted_return']}
             data.append(dbRow)
 
-        with self.engine.connect() as conn:
+        with self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
             conn.execute(text(forecastedSecurityReturnSql), data)
-            conn.commit()
 
-    def saveForecastPScore(self, forecastPScore: pd.DataFrame, ctx: dict):
+    def saveForecastPScore(self, ctx: dict, exchangeCodesList:[]):
 
+        exchangeCodesInStr = ""
+        for ec in exchangeCodesList:
+            exchangeCodesInStr = exchangeCodesInStr + "'" + ec + "',"
+
+        exchangeCodesInStr = exchangeCodesInStr.removesuffix(',')
         forecastedPScoreSql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_SQL, "saveForecastedPScore")
-        data = []
-        for index, row in forecastPScore.iterrows():
-            dbRow = {'security_id':row['security_id'], 'index_id':row['index_id'], 'date':row['date'], 'forecast_model_name':row['forecast_model_name'],
-                             'forecast_period':row['forecast_period'], 'forecast_date':row['forecast_date'], 'forecasted_index_return':row['forecasted_index_return'],
-                             'forecasted_security_return':row['forecasted_security_return'], 'forecasted_p_score':row['forecasted_p_score']}
-            data.append(dbRow)
+        forecastedPScoreSql = forecastedPScoreSql.format(exchangeCodesInStr)
 
-        with self.engine.connect() as conn:
-            conn.execute(text(forecastedPScoreSql), data)
-            conn.commit()
-
-    def loadForecastIndexReturns(self, ctx: dict) -> pd.DataFrame:
-        forecastedIndexReturnsSql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_SQL, "loadForecastedIndexReturns")
-        forecastedPScore = pd.read_sql_query(text(forecastedIndexReturnsSql)
-                                             , self.engine
-                                             , params=ctx
-                                             , index_col='date')
-        return forecastedPScore
+        with self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(text(forecastedPScoreSql), [ctx])
 
     def loadForecastPScore(self, ctx:dict) -> pd.DataFrame:
         forecastedPScoreSql = QueryHolder.getQuery(QueryFiles.SPP_STOCK_DATA_SQL, "loadForecastedPScore")

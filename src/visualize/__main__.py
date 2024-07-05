@@ -14,7 +14,7 @@ if __name__ == '__main__':
     config = readConfig(configFilename='spp_ml_predictor/config.ini')
     sppMLTrainingDao: SppMLDao = SppMLDao(config)
     forecastModel = "SppNN"
-    exchangeCode = "500086"
+    exchangeCode = "505200"
     dateStart = "2018-09-01"
     dateEnd = "2019-08-31"
     compare = 'pscore'
