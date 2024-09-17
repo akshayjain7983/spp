@@ -195,4 +195,4 @@ AND fir.forecast_model_name = :forecastor
 AND fir.forecast_period = :forecastPeriod
 AND (fps.forecast_index_returns_id IS NULL
 		OR fps.forecast_security_returns_id IS NULL)
-AND s.exchange_code IN ({})
+AND s.exchange_code IN ({});

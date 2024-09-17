@@ -35,3 +35,4 @@ replay_pid*
 /workspace.xml
 .idea
 .idea/*
+.venv/*

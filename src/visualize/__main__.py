@@ -43,22 +43,20 @@ if __name__ == '__main__':
     if(compare == 'pscore'):
         plt.plot(forecastPScorePd['forecasted_p_score'], label=('forecastedPScore-' + forecastPeriod))
         plt.plot(actualPScorePd['calculated_p_score'], label=('actualPScore-' + forecastPeriod))
-        mapePscore = mean_absolute_percentage_error(actualPScorePd['calculated_p_score'], forecastPScorePd['forecasted_p_score'])
         rmsePscore = root_mean_squared_error(actualPScorePd['calculated_p_score'], forecastPScorePd['forecasted_p_score'])
         plt.text(datetime.strptime(dateStart, '%Y-%m-%d'), 85, "RMSE PScore {} = {}".format(forecastPeriod, str(rmsePscore)), fontsize=10)
-        plt.text(datetime.strptime(dateStart, '%Y-%m-%d'), 80, "MAPE PScore {} = {}".format(forecastPeriod, str(mapePscore)), fontsize=10)
 
     if(compare == 'index_return'):
         plt.plot(forecastPScorePd['forecasted_index_return'] * 100, label=('forecastedIndexReturn-' + forecastPeriod))
         plt.plot(actualPScorePd['actual_index_return'] * 100, label=('actualIndexReturns-' + forecastPeriod))
-        mapeIndexReturns = mean_absolute_percentage_error(actualPScorePd['actual_index_return'], forecastPScorePd['forecasted_index_return'])
-        plt.text(datetime.strptime(dateStart, '%Y-%m-%d'), 80, "MAPE Index Returns {} = {}".format(forecastPeriod, str(mapeIndexReturns)), fontsize=10)
+        rmseIndexReturns = root_mean_squared_error(actualPScorePd['actual_index_return'], forecastPScorePd['forecasted_index_return'])
+        plt.text(datetime.strptime(dateStart, '%Y-%m-%d'), 80, "RMSE Index Returns {} = {}".format(forecastPeriod, str(rmseIndexReturns)), fontsize=10)
 
     if (compare == 'security_return'):
         plt.plot(forecastPScorePd['forecasted_security_return'] * 100, label=('forecastedSecurityReturn-' + forecastPeriod))
         plt.plot(actualPScorePd['actual_security_return'] * 100, label=('actualSecurityReturns-' + forecastPeriod))
-        mapeSecurityReturns = mean_absolute_percentage_error(actualPScorePd['actual_security_return'], forecastPScorePd['forecasted_security_return'])
-        plt.text(datetime.strptime(dateStart, '%Y-%m-%d'), 75, "MAPE Security Returns {} = {}".format(forecastPeriod, str(mapeSecurityReturns)), fontsize = 10)
+        rmseSecurityReturns = root_mean_squared_error(actualPScorePd['actual_security_return'], forecastPScorePd['forecasted_security_return'])
+        plt.text(datetime.strptime(dateStart, '%Y-%m-%d'), 75, "RMSE Security Returns {} = {}".format(forecastPeriod, str(rmseSecurityReturns)), fontsize = 10)
 
     plt.xlabel("Time", fontsize=15)
     plt.ylabel("PScore", fontsize=15)

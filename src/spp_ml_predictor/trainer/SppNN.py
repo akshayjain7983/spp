@@ -145,10 +145,10 @@ class SppNN(SppMLForecasterCachedModel):
             n_neurons = hp.Int('neurons', min_value=256, max_value=2048, step=64)
             n_hidden = hp.Int('hidden_layers', min_value=1, max_value=7, step=1)
             learning_rate = hp.Choice('learning_rate', values=[1e-3/4, 1e-3/2, 1e-3, 1e-4/4, 1e-4/2, 1e-4, 1e-5/4, 1e-5/2, 1e-5, 1e-6/4, 1e-6/2, 1e-6])
-            n_neurons_layer = n_neurons
+            activation = hp.Choice('activation_function', values=['relu', 'gelu'])
+
             for layer in range(n_hidden):
-                modelTemp.add(Dense(n_neurons_layer, activation='relu'))
-                n_neurons_layer = int(n_neurons_layer/2) + 1
+                modelTemp.add(Dense(n_neurons, activation=activation))
 
             modelTemp.add(Dense(1))
             opt = Adam(learning_rate=learning_rate)
@@ -178,7 +178,7 @@ class SppNN(SppMLForecasterCachedModel):
                             project_name=entityId)
 
         x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=validation_split, shuffle=False)
-        stop_early = EarlyStopping(monitor=monitor, mode='min', min_delta=1e-4, patience=3, start_from_epoch=3)
+        stop_early = EarlyStopping(monitor=monitor, mode='min', min_delta=1e-4, patience=3, start_from_epoch=5)
         tuner.search(x_train, y_train, epochs=epochs, batch_size=batch_size, validation_data=(x_val, y_val), callbacks=[stop_early])
         return tuner
 
@@ -201,7 +201,7 @@ class SppNN(SppMLForecasterCachedModel):
         default_batch_size = self.lags * 3
         batch_size = default_batch_size if (len(train_features) >= default_batch_size) else len(train_features)
         epochs = int(len(train_features) / batch_size) + 1
-        epochs = epochs if(epochs <= 50) else 50
+        epochs = 7 if(epochs <= 7) else (epochs if(epochs <= 50) else 50)
         return batch_size, epochs
 
     def __predict__(self, regressor, pred_features:pd.DataFrame):
