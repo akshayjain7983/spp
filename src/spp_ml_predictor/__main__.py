@@ -3,6 +3,7 @@ import subprocess
 import sys
 import time
 import logging
+import glob
 
 from .dao import SppMLDao
 from .dao import QueryFiles
@@ -10,7 +11,7 @@ from datetime import datetime, timedelta
 from .config.ConfigReader import readConfig
 from .util import util
 from .trainer import trainer
-import os
+
 
 logger = logging.getLogger('spp')
 
@@ -69,6 +70,87 @@ def waitForChildProcesses(childProcesses:[]):
 
     return failedSecurityProcesses
 
+def modelExists(config:dict, subjectCode:str)->bool:
+    fileName = config['ml-models.location']
+    fileName += 'SPP-ML-Model__*__'+subjectCode+'__*.keras';
+    files = glob.glob(fileName)
+    return len(files) > 0
+
+def triggerAndWaitForDate(pScoreDate:datetime, max_processes:int, configForSubProcess:dict, exchange:str
+                          , index:str, segment:str, forecastDays:int, forecastor:str, dataHistoryMonths:str, exchangeCodes:[]
+                          , useGpu:bool, forecastIndex:bool=True, multiprocessing:bool=True):
+    childProcesses = []
+    process_count = 0
+    failedSecurityProcesses = {}
+
+    #triggering index
+    if(forecastIndex):
+        ctxIndex = {'config': configForSubProcess
+            , 'trainerInvocationMode': 'index'
+            , 'exchange': exchange
+            , 'pScoreDate': datetime.strftime(pScoreDate, '%Y-%m-%d')
+            , 'subjectCode': index
+            , 'segment': segment
+            , 'forecastDays': str(forecastDays)
+            , 'forecastor': forecastor
+            , 'dataHistoryMonths': dataHistoryMonths
+            , 'useGpu': useGpu}
+
+        if (multiprocessing):
+            childProcessIdx = triggerSubProcessForForecasting(ctxIndex)
+            childProcesses.append(childProcessIdx)
+            process_count += 1
+            logger.info("Triggered for subject: " + index + ' using ctx:' + str(ctxIndex))
+
+            # always wait for index prediction because if index prediction fails then we fail the entire process
+            failedSecurityProcessesT1 = waitForChildProcesses(childProcesses)
+            if (len(failedSecurityProcessesT1) > 0):
+                raise ChildProcessError('Failed to predict for index. Cannot process further')
+            process_count = 0
+            childProcesses.clear()
+
+        else:
+            triggerCurrentProcessForForecasting(ctxIndex)
+
+    #triggering securities
+    for ec in exchangeCodes:
+
+        ctxSecurity = {'config': configForSubProcess
+            , 'trainerInvocationMode': 'security'
+            , 'exchange': exchange
+            , 'pScoreDate': datetime.strftime(pScoreDate, '%Y-%m-%d')
+            , 'subjectCode': ec
+            , 'segment': segment
+            , 'forecastDays': str(forecastDays)
+            , 'forecastor': forecastor
+            , 'dataHistoryMonths': dataHistoryMonths
+            , 'useGpu': useGpu}
+
+        if (multiprocessing):
+            childProcessSec = triggerSubProcessForForecasting(ctxSecurity)
+            childProcesses.append(childProcessSec)
+            process_count += 1
+
+            logger.info("Triggered for subject: " + ec + ' using ctx:' + str(ctxSecurity))
+
+            if (process_count == max_processes):
+                failedSecurityProcessesT1 = waitForChildProcesses(childProcesses)
+                #securities which fail for current date are ignored for subsequent dates
+                if (len(failedSecurityProcessesT1) > 0):
+                    failedSecurityProcesses.update(failedSecurityProcessesT1)
+                process_count = 0
+                childProcesses.clear()
+        else:
+            triggerCurrentProcessForForecasting(ctxSecurity)
+
+    # finish off this date in case any left to finish before moving to next date
+    if (multiprocessing and len(childProcesses) > 0):
+        failedSecurityProcessesT1 = waitForChildProcesses(childProcesses)
+        if (len(failedSecurityProcessesT1) > 0):
+            failedSecurityProcesses.update(failedSecurityProcessesT1)
+
+    return failedSecurityProcesses
+
 def main(args):
     config = readConfig(configFilename = 'spp_ml_predictor/config.ini')
     QueryFiles.load()
@@ -103,87 +185,178 @@ def main(args):
                                             })
 
     pScoreBusinessDates = util.business_date_range(pScoreStartDate, pScoreEndDate, holidays)
-    childProcesses = []
-    multiprocessing = True #len(exchangeCodes) > 1
+    multiprocessing = True
     maxProcessesConfig = int(config['ml-params.max-process'])
-    config = 'None' if(multiprocessing) else config
+    configForSubProcess = 'None' if(multiprocessing) else config
     failedSecurityProcesses = {}
 
     for pScoreDate in pScoreBusinessDates:
 
         logger.info("Starting for date: "+datetime.strftime(pScoreDate, '%Y-%m-%d'))
 
-        max_processes = maxProcessesConfig if (pScoreDate > pScoreBusinessDates[0]) else 1 #less parallel for first date since many models are trained during first time tuning
-        process_count = 0
-        childProcesses.clear()
+        #first find all those subjectCodes where NO model exists on first date.
+        # If model cannot be built on first date then for subsequent dates in this range these securities will be ignored.
+        # It is designed like this for performance reasons
+        modelNotExistSubjectCodes = []
+        indexModelExists = modelExists(config, index)
 
-        if(forecastIndex):
-            # first submit for index
-            ctxIndex = {'config': config
-                , 'trainerInvocationMode': 'index'
-                , 'exchange': exchange
-                , 'pScoreDate': datetime.strftime(pScoreDate, '%Y-%m-%d')
-                , 'subjectCode': index
-                , 'segment': segment
-                , 'forecastDays': str(forecastDays)
-                , 'forecastor': forecastor
-                , 'dataHistoryMonths': dataHistoryMonths
-                , 'useGpu': max_processes == 1}
-
-            if(multiprocessing):
-                childProcessIdx = triggerSubProcessForForecasting(ctxIndex)
-                childProcesses.append(childProcessIdx)
-                process_count += 1
-                logger.info("Triggered for subject: " + index + ' using ctx:' + str(ctxIndex))
-
-                if (process_count == max_processes):
-                    failedSecurityProcessesT1 = waitForChildProcesses(childProcesses)
-                    if(len(failedSecurityProcessesT1)>0):
-                        raise ChildProcessError('Failed to predict for index. Cannot process further')
-                    process_count = 0
-                    childProcesses.clear()
-
-            else:
-                triggerCurrentProcessForForecasting(ctxIndex)
-
-        # next do for securities
         for ec in exchangeCodes:
+            ecModelExists = modelExists(config, ec)
+            if ((not ecModelExists) and (not (ec in failedSecurityProcesses))):
+                modelNotExistSubjectCodes.append(ec)
 
-            if(ec in failedSecurityProcesses):
-                continue #do not execute for any failed security for any past date
 
-            ctxSecurity = {'config': config
-                , 'trainerInvocationMode': 'security'
-                , 'exchange': exchange
-                , 'pScoreDate': datetime.strftime(pScoreDate, '%Y-%m-%d')
-                , 'subjectCode': ec
-                , 'segment': segment
-                , 'forecastDays': str(forecastDays)
-                , 'forecastor': forecastor
-                , 'dataHistoryMonths': dataHistoryMonths
-                , 'useGpu': max_processes == 1}
+        #first run for those for which no model exists
+        if(not indexModelExists or len(modelNotExistSubjectCodes)>0):
+            max_processes = 1
+            failedSecurityProcessesT1 = triggerAndWaitForDate(pScoreDate, max_processes, configForSubProcess, exchange, index, segment
+                                                              , forecastDays, forecastor, dataHistoryMonths, modelNotExistSubjectCodes
+                                                              , True, multiprocessing, forecastIndex)
+            failedSecurityProcesses.update(failedSecurityProcessesT1)
 
-            if(multiprocessing):
-                childProcessSec = triggerSubProcessForForecasting(ctxSecurity)
-                childProcesses.append(childProcessSec)
-                process_count += 1
+        # if (forecastIndex and not indexModelExists):
+        #     ctxIndex = {'config': configForSubProcess
+        #         , 'trainerInvocationMode': 'index'
+        #         , 'exchange': exchange
+        #         , 'pScoreDate': datetime.strftime(pScoreDate, '%Y-%m-%d')
+        #         , 'subjectCode': index
+        #         , 'segment': segment
+        #         , 'forecastDays': str(forecastDays)
+        #         , 'forecastor': forecastor
+        #         , 'dataHistoryMonths': dataHistoryMonths
+        #         , 'useGpu': True}
+        #
+        #     if (multiprocessing):
+        #         childProcessIdx = triggerSubProcessForForecasting(ctxIndex)
+        #         childProcesses.append(childProcessIdx)
+        #         process_count += 1
+        #         logger.info("Triggered for subject: " + index + ' using ctx:' + str(ctxIndex))
+        #
+        #         if (process_count == max_processes):
+        #             failedSecurityProcessesT1 = waitForChildProcesses(childProcesses)
+        #             if (len(failedSecurityProcessesT1) > 0):
+        #                 raise ChildProcessError('Failed to predict for index. Cannot process further')
+        #             process_count = 0
+        #             childProcesses.clear()
+        #
+        #     else:
+        #         triggerCurrentProcessForForecasting(ctxIndex)
+        #
+        #
+        # for ec in modelNotExistSubjectCodes:
+        #
+        #     if(ec in failedSecurityProcesses):
+        #         continue #do not execute for any failed security for any past date
+        #
+        #     ctxSecurity = {'config': configForSubProcess
+        #         , 'trainerInvocationMode': 'security'
+        #         , 'exchange': exchange
+        #         , 'pScoreDate': datetime.strftime(pScoreDate, '%Y-%m-%d')
+        #         , 'subjectCode': ec
+        #         , 'segment': segment
+        #         , 'forecastDays': str(forecastDays)
+        #         , 'forecastor': forecastor
+        #         , 'dataHistoryMonths': dataHistoryMonths
+        #         , 'useGpu': True}
+        #
+        #     if(multiprocessing):
+        #         childProcessSec = triggerSubProcessForForecasting(ctxSecurity)
+        #         childProcesses.append(childProcessSec)
+        #         process_count += 1
+        #
+        #         logger.info("Triggered for subject: " + ec + ' using ctx:' + str(ctxSecurity))
+        #
+        #         if(process_count == max_processes):
+        #             failedSecurityProcessesT1 = waitForChildProcesses(childProcesses)
+        #             if (len(failedSecurityProcessesT1) > 0):
+        #                 failedSecurityProcesses.update(failedSecurityProcessesT1)
+        #             process_count = 0
+        #             childProcesses.clear()
+        #     else:
+        #         triggerCurrentProcessForForecasting(ctxSecurity)
 
-                logger.info("Triggered for subject: " + ec + ' using ctx:' + str(ctxSecurity))
+        # now do for rest for which model exists already
+        max_processes = maxProcessesConfig
+        exchangeCodesParallel = []
+        for ec in exchangeCodes:
+            if (ec in failedSecurityProcesses or ec in modelNotExistSubjectCodes):
+                continue  # do not execute for any failed security for any past date OR if first time model building done above
+            exchangeCodesParallel.append(ec)
 
-                if(process_count == max_processes):
-                    failedSecurityProcessesT1 = waitForChildProcesses(childProcesses)
-                    if (len(failedSecurityProcessesT1) > 0):
-                        failedSecurityProcesses.update(failedSecurityProcessesT1)
-                    process_count = 0
-                    childProcesses.clear()
-            else:
-                triggerCurrentProcessForForecasting(ctxSecurity)
 
-        # finish off this date in case any left to finish before moving to next date
-        if(multiprocessing and len(childProcesses)>0):
-            failedSecurityProcessesT1 = waitForChildProcesses(childProcesses)
-            if (len(failedSecurityProcessesT1) > 0):
-                failedSecurityProcesses.update(failedSecurityProcessesT1)
+
+        failedSecurityProcessesT1 = triggerAndWaitForDate(pScoreDate, max_processes, configForSubProcess, exchange, index, segment
+                                                          , forecastDays, forecastor, dataHistoryMonths, exchangeCodesParallel
+                                                          , False, multiprocessing, (forecastIndex and indexModelExists))
+        failedSecurityProcesses.update(failedSecurityProcessesT1)
+
+        # if(forecastIndex and indexModelExists):
+        #     # first submit for index
+        #     ctxIndex = {'config': configForSubProcess
+        #         , 'trainerInvocationMode': 'index'
+        #         , 'exchange': exchange
+        #         , 'pScoreDate': datetime.strftime(pScoreDate, '%Y-%m-%d')
+        #         , 'subjectCode': index
+        #         , 'segment': segment
+        #         , 'forecastDays': str(forecastDays)
+        #         , 'forecastor': forecastor
+        #         , 'dataHistoryMonths': dataHistoryMonths
+        #         , 'useGpu': False}
+        #
+        #     if(multiprocessing):
+        #         childProcessIdx = triggerSubProcessForForecasting(ctxIndex)
+        #         childProcesses.append(childProcessIdx)
+        #         process_count += 1
+        #         logger.info("Triggered for subject: " + index + ' using ctx:' + str(ctxIndex))
+        #
+        #         #always wait for index prediction because if index prediction fails then we fail the entire process
+        #         failedSecurityProcessesT1 = waitForChildProcesses(childProcesses)
+        #         if (len(failedSecurityProcessesT1) > 0):
+        #             raise ChildProcessError('Failed to predict for index. Cannot process further')
+        #         process_count = 0
+        #         childProcesses.clear()
+        #
+        #     else:
+        #         triggerCurrentProcessForForecasting(ctxIndex)
+        #
+        # # next do for securities
+        # for ec in exchangeCodes:
+        #
+        #     if(ec in failedSecurityProcesses or ec in modelNotExistSubjectCodes):
+        #         continue #do not execute for any failed security for any past date OR if first time model building done above
+        #
+        #     ctxSecurity = {'config': configForSubProcess
+        #         , 'trainerInvocationMode': 'security'
+        #         , 'exchange': exchange
+        #         , 'pScoreDate': datetime.strftime(pScoreDate, '%Y-%m-%d')
+        #         , 'subjectCode': ec
+        #         , 'segment': segment
+        #         , 'forecastDays': str(forecastDays)
+        #         , 'forecastor': forecastor
+        #         , 'dataHistoryMonths': dataHistoryMonths
+        #         , 'useGpu': False}
+        #
+        #     if(multiprocessing):
+        #         childProcessSec = triggerSubProcessForForecasting(ctxSecurity)
+        #         childProcesses.append(childProcessSec)
+        #         process_count += 1
+        #
+        #         logger.info("Triggered for subject: " + ec + ' using ctx:' + str(ctxSecurity))
+        #
+        #         if(process_count == max_processes):
+        #             failedSecurityProcessesT1 = waitForChildProcesses(childProcesses)
+        #             if (len(failedSecurityProcessesT1) > 0):
+        #                 failedSecurityProcesses.update(failedSecurityProcessesT1)
+        #             process_count = 0
+        #             childProcesses.clear()
+        #     else:
+        #         triggerCurrentProcessForForecasting(ctxSecurity)
+        #
+        # # finish off this date in case any left to finish before moving to next date
+        # if(multiprocessing and len(childProcesses)>0):
+        #     failedSecurityProcessesT1 = waitForChildProcesses(childProcesses)
+        #     if (len(failedSecurityProcessesT1) > 0):
+        #         failedSecurityProcesses.update(failedSecurityProcessesT1)
 
         logger.info("PScore for date: " + datetime.strftime(pScoreDate, '%Y-%m-%d'))
         #finally trigger pScore calc for date

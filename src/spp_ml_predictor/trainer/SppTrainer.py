@@ -9,6 +9,9 @@ from ..dao import SppMLDao
 from ..trainer.SppIndexForecastTask import SppIndexForecastTask
 from ..trainer.SppSecurityForecastTask import SppSecurityForecastTask
 from ..util import util
+import logging
+
+logger = logging.getLogger('spp')
 
 
 class SppTrainer:
@@ -71,7 +74,8 @@ class SppTrainer:
         minDataDays = int(len(businessDates)*0.99)
         dataDays = securityPricesPdf.shape[0]
         if(dataDays < minDataDays):
-            return
+            logger.warning("Not enough data for prediction for security : "+self.ctx['exchangeCode'])
+            exit(1)
 
         interestRatesPdf = trainingDataForTraining['interestRatesPdf']
         inflationRatesPdf = trainingDataForTraining['inflationRatesPdf']
